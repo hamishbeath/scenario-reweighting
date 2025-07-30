@@ -33,25 +33,30 @@ def main() -> None:
     # results = read_csv(INPUT_DIR + 'ar6_data_weights.csv')
 
     #categories=['C1', 'C2']
-    # harmonised_emissions_data = read_csv('inputs/AR6_harmonised_emissions_data.csv')
+    harmonised_emissions_data = read_csv('inputs/AR6_harmonised_emissions_data.csv')
+    
+
+
     # df_results = read_csv('outputs/composite_weights_ar6_q3_sigma.csv')
     ar6_meta = read_csv('inputs/ar6_meta_data')
-    # model_family_df = read_csv('inputs/model_family.csv')
-    # df_results = add_meta_cols(df_results, ar6_meta, ['Category', 'Category_subset', 'Project_study'])
-    # df_results['Project'] = df_results['Project_study']
-    # df_results = model_family(df_results, model_family_df)
-    # # print(df_results)
-    
-    # create_database_impact_subplots(df_results, GROUP_MODES, categories=['C2', 'C1'])
+    # harmonised_emissions_data = add_meta_cols(harmonised_emissions_data, ar6_meta, ['Category'])
+    # ar6_meta = ar6_meta.reset_index()
+    model_family_df = read_csv('inputs/model_family.csv')
+    df_results = read_csv('outputs/variable_weights_ar6_median_sigma.csv')
+    df_results = add_meta_cols(df_results, ar6_meta, ['Category', 'Category_subset', 'Project_study'])
+    df_results['Project'] = df_results['Project_study']
+    df_results = model_family(df_results, model_family_df)
+    print(df_results)
+    create_database_impact_variable(df_results, 'Primary Energy|Coal', GROUP_MODES)
     # plot_timeseries(df_results, harmonised_emissions_data)
-    df_results = read_csv('outputs/relevance_weighting.csv')
+    # df_results = read_csv('outputs/relevance_weighting.csv')
     # timeseries_data = read_csv('inputs/ar6_pathways_tier0.csv')
     # variable_weight_subplots(df_results, timeseries_data, TIER_0_VARIABLES, categories=['C1', 'C2'], meta=ar6_meta)
-    plot_relevance_against_meta(df_results, ar6_meta, ['C1', 'C2'], RELEVANCE_VARIABLES, CATEGORY_COLOURS_DICT)
+    # plot_relevance_against_meta(df_results, ar6_meta, ['C1', 'C2'], RELEVANCE_VARIABLES, CATEGORY_COLOURS_DICT, harmonised_emissions_data)
 
 
 
-def plot_relevance_against_meta(relevance_df, meta_df, categories, variables, category_colours):
+def plot_relevance_against_meta(relevance_df, meta_df, categories, variables, category_colours, emissions_data):
     """
     Function that plots the relevance weighting against each of the variables that went into it. 
     So, for each category, a scatter plot of the variable, and the relevance weighting score
@@ -75,11 +80,13 @@ def plot_relevance_against_meta(relevance_df, meta_df, categories, variables, ca
     plt.rcParams['ytick.right'] = True
     plt.rcParams['axes.linewidth'] = 0.5
 
-    fig, axs = plt.subplots(len(categories), 2, figsize=(8, 8),  sharex=True, facecolor='white')
+    fig, axs = plt.subplots(len(categories), 3, figsize=(8, 8),  facecolor='white')
 
     relevance_df = relevance_df.set_index(['Model', 'Scenario'])
     meta_df = meta_df.set_index(['Model', 'Scenario'])
     
+    emissions_data = emissions_data[emissions_data['Variable']=='AR6 climate diagnostics|Infilled|Emissions|CO2']
+
     for i, category in enumerate(categories):
         
         print(category)
@@ -107,11 +114,61 @@ def plot_relevance_against_meta(relevance_df, meta_df, categories, variables, ca
 
             # set the title and labels
             axs[i,j].set_title(f'{category} - {variable}')
-            axs[i,j].set_xlabel('relevance Weighting')
+            axs[i,j].set_xlabel('Relevance Weighting')
             # axs[i,j].set_ylabel(variable_data['Unit'].values[0] if not variable_data.empty else 'Unit Not Found')
 
-    plt.show()
+        # now add a subplot showing the weighted and unweighted emissions trajectories (Median and IQR)
+        category_emissions_data = emissions_data[emissions_data['Category'] == category]
+        category_emissions_data = category_emissions_data.set_index(['Model', 'Scenario'])
 
+        # join the emissions data onto the relevance data
+        relevance_data = relevance_data.join(category_emissions_data, how='left', rsuffix='_emissions')
+
+        medians = []
+        weighted_medians = []
+        lower_qs = []
+        upper_qs = []
+        weighted_lower_qs = []
+        weighted_upper_qs = []
+
+        years = []
+        count = 2020
+
+        for year in range(2020, 2101, 5):
+            median = relevance_data[str(year)].median()
+            lower_q = relevance_data[str(year)].quantile(0.25)
+            upper_q = relevance_data[str(year)].quantile(0.75)
+
+            weighted_median = wquantiles.median(relevance_data[str(year)], relevance_data['relevance_weighting'])
+            weighted_lower_q = wquantiles.quantile(relevance_data[str(year)], relevance_data['relevance_weighting'], 0.25)
+            weighted_upper_q = wquantiles.quantile(relevance_data[str(year)], relevance_data['relevance_weighting'], 0.75)
+            medians.append(median)
+            lower_qs.append(lower_q)
+            upper_qs.append(upper_q)
+            weighted_lower_qs.append(weighted_lower_q)
+            weighted_upper_qs.append(weighted_upper_q)
+            weighted_medians.append(weighted_median)
+            years.append(count)
+            count += 5
+
+        # fill between the upper and lower quartiles
+        axs[i, j+1].fill_between(years, lower_qs, upper_qs, color=CATEGORY_COLOURS_DICT[category], alpha=0.2, edgecolor="none")
+        axs[i, j+1].fill_between(years, weighted_lower_qs, weighted_upper_qs, color=CATEGORY_COLOURS_DICT[category], alpha=0.2, linewidth=1, linestyle='dotted')
+
+        axs[i, j+1].plot(years, medians, color=CATEGORY_COLOURS_DICT[category], linestyle='--', linewidth=1, alpha=0.5)
+        axs[i, j+1].plot(years, weighted_medians, color=CATEGORY_COLOURS_DICT[category], linestyle='dotted', linewidth=1, alpha=0.5)
+
+        axs[i, j+1].set_title(f'{category} - CO2 Emissions')
+    
+        # make the x ticks only every 20 years
+        axs[i, j+1].set_xticks(years[::4])
+        axs[i, j+1].set_xticklabels([str(year) for year in years[::4]])
+        axs[i, j+1].set_xlabel('Year')
+        axs[i, j+1].set_ylabel('CO2 Emissions (MtCO2)')
+        axs[i, j+1].set_xlim(2020, 2100)
+
+
+    plt.show()
 
 
 # Function that takes the weights and examines simple changes in stats in weighted vs unweighted distributions
@@ -183,7 +240,97 @@ def create_database_impact_subplots(results, grouping_modes, categories=None, ca
         axs[i].set_ylim(0, MODES_YMAX[mode])
         
     plt.show()
-    
+
+
+
+# Function that takes the weights and examines simple changes in stats in weighted vs unweighted distributions
+def create_database_impact_variable(results, variable, grouping_modes,categories=None, category_colours=None):
+
+    """
+    Function that plots the change in distribution of scenarios by model, model family 
+    project etc. and by category (if specified)
+
+    Inputs:
+    - results: .csv with the list of scenarios with filtering mode (proj etc) and weights
+    - category_colours: category colours, if needed
+    - grouping_modes: possible modes of grouping/filtering scenarios 
+    - categories: list of categories to filter by, if None, all categories are used
+    - category_colours: dictionary of colours by category
+
+    """
+    plt.rcParams['ytick.major.left'] = True
+    plt.rcParams['ytick.major.right'] = True
+    plt.rcParams['ytick.minor.visible'] = True
+    plt.rcParams['xtick.top'] = True
+    plt.rcParams['ytick.right'] = True
+    plt.rcParams['axes.linewidth'] = 0.75
+
+    print(variable)
+    variable_results = results[results['Variable'] == variable]
+
+    variable_results['Scenario_model'] = variable_results['Scenario'] + variable_results['Model']
+
+    # # add the categories column to the dataframe
+    # variable_results = add_meta_cols(results, meta_data, ['Category'])
+
+    # filter for specific categories if needed
+    if categories != None:
+
+        # Filter the results by the categories
+        variable_results = variable_results.loc[variable_results['Category'].isin(categories)]
+
+    # set the figure
+    fig, axs = plt.subplots(len(grouping_modes), 1, figsize=(7.08, 3), facecolor='white')
+
+    variable_results['Weight'] = -variable_results['Weight']
+    if min(variable_results['Weight']) < 0:
+        
+        # If the minimum weight is negative, we need to shift the weights to make them all positive
+        variable_results['Weight'] = variable_results['Weight'] - np.min(variable_results['Weight'])
+
+    variable_results['Weight'] = variable_results['Weight'] / np.sum(variable_results['Weight'])
+
+    # loop through modes
+    for i, mode in enumerate(grouping_modes):
+
+        # group by the grouping_mode column
+        mode_results = variable_results.groupby(mode).agg({
+            'Weight': 'sum',
+            'Scenario_model': 'nunique',
+        }).reset_index()
+
+        weight_total = mode_results['Weight'].sum()
+        scenarios_total = mode_results['Scenario_model'].sum()
+        mode_results['Weight_fraction'] = (mode_results['Weight'] / weight_total) * 100
+        mode_results['Scenarios_fraction'] = (mode_results['Scenario_model'] / scenarios_total) * 100
+
+        print(mode_results)
+
+        # Plot bars for each item next to each other, showing the scenarios fraction and the weight fraction
+        # set the x positions for the bars
+        x_positions = np.arange(len(mode_results))
+        width = 0.35  # Width of the bars
+        # Plot the bars for the scenarios fraction
+        axs[i].bar(x_positions - width/2, mode_results['Scenarios_fraction'], width, label='Unweighted Scenario Share', 
+                   color=MODES_COLOURS[mode], alpha=0.4, edgecolor='darkgray', linewidth=0.5)
+        # Plot the bars for the weight fraction
+        axs[i].bar(x_positions + width/2, mode_results['Weight_fraction'], width, label='Weighted Scenario Share', 
+                   color=MODES_COLOURS[mode], alpha=0.9, edgecolor='darkgray', linewidth=0.5)
+
+        # Set the x-ticks to the mode results
+        axs[i].set_xticks(x_positions)
+        axs[i].set_xticklabels(mode_results[mode], rotation=45, ha='right')
+        axs[i].set_ylabel('Fraction (%)')
+        axs[i].set_title(f'Fraction of scenarios and weights by {mode}')
+        axs[i].set_ylim(0, MODES_YMAX[mode])
+        
+    plt.show()
+
+
+
+
+
+
 def plot_timeseries(df_results, harmonised_emissions_data):
 
     # plt.rcParams['xtick.minor.visible'] = True
@@ -463,6 +610,9 @@ def plot_timeseries(df_results, harmonised_emissions_data):
     # plt.tight_layout()
     # plt.savefig('figures/timeseries_new.pdf')
     plt.show()  
+
+
+
 
 # Function that takes the variable weights individually, and applies them to each of the variables
 def variable_weight_subplots(variable_weights_data, timeseries_data, variables, categories=None, meta=None):

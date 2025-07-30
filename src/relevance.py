@@ -20,10 +20,11 @@ def main():
     relevance_weighting = calculate_relevance_weighting(df, ['C1', 'C2'], steepness=10, meta_variables=RELEVANCE_VARIABLES)
     relevance_weighting.to_csv(OUTPUT_DIR + 'relevance_weighting.csv', index=False)
 
+
+
 # Function that calculates the relevance weighting for a given set of scenarios.
 def calculate_relevance_weighting(df, categories, steepness=10, meta_variables=dict):
 
-    
     output_df = pd.DataFrame()
     
     # loop through the categories

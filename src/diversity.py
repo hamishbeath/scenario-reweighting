@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import wquantiles
 import copy
 import json
-import pickle
 from tqdm import tqdm
 from constants import *
 from itertools import combinations
@@ -32,12 +31,12 @@ def main():
     # # scenario_variable_weights = read_csv(OUTPUT_DIR + 'variable_weights_ar6_ar6_median_weights.csv')
     # calculate_composite_weight(scenario_variable_weights, ar6_tier_0_data, VARIABLE_INFO, 'ar6_' + sigma_string + '_sigma', raw=False, normalise=False)
 
-    coal_data = read_csv('~/Library/Mobile Documents/com~apple~CloudDocs/societal-transition-pathways/plotting_data_AR6_coal.csv')
-    meta = read_csv(INPUT_DIR + 'ar6_meta_data.csv')
-    coal_data_with_meta = add_meta_cols(coal_data,  meta, metacols=['Category', 'Category_subset'])
-    coal_data_with_meta.to_csv('~/Library/Mobile Documents/com~apple~CloudDocs/societal-transition-pathways/plotting_data_AR6_coal.csv', index=False)
-
-
+    # coal_data = read_csv('~/Library/Mobile Documents/com~apple~CloudDocs/societal-transition-pathways/plotting_data_AR6_coal.csv')
+    # meta = read_csv(INPUT_DIR + 'ar6_meta_data.csv')
+    # coal_data_with_meta = add_meta_cols(coal_data,  meta, metacols=['Category', 'Category_subset'])
+    # coal_data_with_meta.to_csv('~/Library/Mobile Documents/com~apple~CloudDocs/societal-transition-pathways/plotting_data_AR6_coal.csv', index=False)
+    sigma_tests = ['min', 'q1', 'median', 'q3', 'max']
+    determine_sigma_greatest_diversity('ar6', sigma_tests, TIER_0_VARIABLES)
 
 # Function to Calculate sigma values
 def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables):
@@ -434,26 +433,81 @@ def adjust_weights_for_missing_variables(missing_variables, variable_info):
     return variable_info
 
 
+# function that determines the sigma value for the greatest diversity (IQR)
+def determine_sigma_greatest_diversity(database, sigma_values, variables):
 
+    """
+    Function that runs through each dataframe with different sigma values, calculates
+    the **normalised IQR for each variable**, calculates the mean IQR for the set and 
+    saves to a CSV file.
 
-        
+    Parameters:
+    database (str): The database to use for the analysis.
+    sigma_values (list): Sigma values to test (used for file extraction).
 
+    Returns:
+    DataFrame: A DataFrame containing the normalised IQR for each variable and the mean IQR for the set 
+    for each sigma value.
 
-#     stats = {}
-#     for variable in data['Variable'].unique():
-        
-#         var_data = data[data['Variable'] == variable]
-#         stats[variable] = {
-#             'mean': var_data['RMS_Distance'].mean(),
-#             'median': var_data['RMS_Distance'].median(),
-#             'min': var_data['RMS_Distance'].min(),
-#             'max': var_data['RMS_Distance'].max(),
-#             'std': var_data['RMS_Distance'].std()
-#         }
-#     stats_df = pd.DataFrame.from_dict(stats, orient='index')        
-#     print(stats_df)
+    """
 
+    stats = pd.DataFrame(columns=['Variable', 'Sigma', 'IQR', 'EFSS'])
 
+    # Loop through each sigma value
+    for sigma in sigma_values:
+
+        # open the relevant pairwise RMS distances file
+        sigma_df = read_csv(OUTPUT_DIR + f"variable_weights_{database}_{sigma}_sigma.csv")
+        variables = sigma_df['Variable'].unique().tolist()
+
+        sigma_df['Weight'] = -sigma_df['Weight']
+        if min(sigma_df['Weight']) < 0:
+
+            # If the minimum weight is negative, we need to shift the weights to make them all positive
+            sigma_df['Weight'] = sigma_df['Weight'] - np.min(sigma_df['Weight'])
+
+        sigma_df['Weight'] = sigma_df['Weight'] / np.sum(sigma_df['Weight'])
+
+        iqrs = []
+        effective_sample_size = []
+        # Loop through each variable
+        for variable in variables:
+
+            variable_df = sigma_df[sigma_df['Variable'] == variable]
+
+            # get the IQR of the weights
+            iqrs.append(variable_df['Weight'].quantile(0.75) - variable_df['Weight'].quantile(0.25))
+
+            # calculate the effective sample size
+            effective_sample_size.append(1 / sum(variable_df['Weight']**2))
+
+        # Calculate the mean IQR for the set
+        mean_iqr = np.mean(iqrs) 
+        mean_efss = np.mean(effective_sample_size)
+        iqrs.append(mean_iqr)
+        variables.append('mean')
+
+        # concat the results to the stats DataFrame
+        stats = pd.concat([stats, pd.DataFrame({
+            'Variable': variables,
+            'Sigma': [sigma] * len(variables),
+            'IQR': iqrs,
+            'EFSS': effective_sample_size + [mean_efss]
+        })], ignore_index=True)
+
+    # Save the stats DataFrame to a CSV file
+    stats.to_csv(OUTPUT_DIR + f'sigma_greatest_diversity_{database}.csv', index=False)
+
+        #    # plot the weights as a distribution showing the IQR
+        #     plt.figure(figsize=(10, 6))
+        #     plt.hist(variable_df['Weight'], bins=30, alpha=0.7, color='blue', edgecolor='black')
+        #     plt.title(f'Weight Distribution for {variable} (Sigma: {sigma})')
+        #     plt.xlabel('Weight')
+        #     plt.ylabel('Frequency')
+        #     plt.axvline(variable_df['Weight'].quantile(0.25), color='red', linestyle='dashed', linewidth=1, label='Q1')
+        #     plt.axvline(variable_df['Weight'].quantile(0.75), color='green', linestyle='dashed', linewidth=1, label='Q3')
+        #     plt.legend()
+        #     plt.show()
 
 
 
