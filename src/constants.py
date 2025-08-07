@@ -166,6 +166,25 @@ VARIABLE_INFO = {
     }
 }
 
+
+CORREL_ADJUSTED_WEIGHTS_FLAT = {'Carbon Sequestration|CCS': 0.06350000662461833, 
+                           'Consumption': 0.09892179218802338, 
+                           'Emissions|CH4': 0.04368429440563589, 
+                           'Emissions|CO2': 0.039004060210069476, 
+                           'Emissions|N2O': 0.062417844360139293, 
+                           'Emissions|Sulfur': 0.05099491276898346, 
+                           'Final Energy': 0.056082862486714284, 
+                           'GDP|PPP': 0.1305399153165156, 
+                           'Price|Carbon': 0.09189557268372808, 
+                           'Primary Energy|Biomass': 0.0666941271308423, 
+                           'Primary Energy|Coal': 0.04452490999812596, 
+                           'Primary Energy|Gas': 0.04891914307956432, 
+                           'Primary Energy|Non-Biomass Renewables': 0.06731958199928102, 
+                           'Primary Energy|Nuclear': 0.0858056696389693, 
+                           'Primary Energy|Oil': 0.049695307108789395
+}
+
+
 # SSP Scenarios
 SSP_SCENARIOS = ssp_scenarios = [
     'SSP1-19', 'SSP1-26', 'SSP1-34', 'SSP1-45', 'SSP1-Baseline',
@@ -218,7 +237,35 @@ CATEGORY_NAMES = [
     # 'Below 4°C',
     # 'Above 4°C']
 
-COLOUR_DICT_STICK_PLOTS = {'Unweighted':{'C1':'#7798EC', 'C1a_NZGHGs':'#97CAEA', 'C2':'#D877A8'}, 'Reweighted':{'C1':'#6B88D4', 'C1a_NZGHGs':'#86B2CE', 'C2':'#DC267F'}}
+CB_COLOUR_MAP = [
+    "#000000",  # Black
+    "#E69F00",  # Orange
+    "#56B4E9",  # Sky Blue
+    "#009E73",  # Bluish Green
+    "#F0E442",  # Yellow
+    "#0072B2",  # Blue
+    "#D55E00",  # Vermilion
+    "#CC79A7",  # Reddish Purple
+    "#999999",  # Grey
+    "#117733",  # Dark Green (distinct from bluish green)
+    "#AA4499",  # Magenta (more distinct from reddish purple)
+    "#DDCC77",  # Sand (pale yellow-brown)
+    "#882255",  # Burgundy (dark reddish)
+    "#44AA99",  # Teal (distinct from blue & green)
+    "#661100",  # Dark Brown
+]
+
+CB_CAT_COLORS = {'C1':'#332288', 
+                'C2':'#117733', 
+                'C3':'#44AA99', 
+                'C4':'#88CCEE', 
+                'C5':'#DDCC77', 
+                'C6':'#CC6677', 
+                'C7':'#AA4499', 
+                'C8':'#882255'}
+
+COLOUR_DICT_STICK_PLOTS = {'Unweighted':{'C1':'#7798EC', 'C1a_NZGHGs':'#97CAEA', 'C2':'#D877A8'}, 
+                            'Reweighted':{'C1':'#6B88D4', 'C1a_NZGHGs':'#86B2CE', 'C2':'#DC267F'}}
 
 
 # Relevance Weighting constants
@@ -233,6 +280,29 @@ RELEVANCE_THRESHOLDS = {
         'Median warming in 2100 (MAGICCv7.5.3)': 1.5
     }
 }
+
+# Quality Weighting Constants
+VETTING_CRITERIA = {'CO2 Total':{'Variables':['Emissions|CO2'],
+                                'Value': 44251, # in MtCO2
+                                'Range': 0.40}, # +/- % #
+                    'CO2 EIP emissions':{'Variables':['Emissions|CO2|Energy and Industrial Processes'],
+                                'Value': 37646, # in MtCO2
+                                'Range': 0.20}, # +/- % #
+                    'CH4 emissions':{'Variables':['Emissions|CH4'],
+                                'Value': 379, # in MtCH4
+                                'Range': 0.20}, # +/- % #
+                    'Primary Energy': {'Variables':['Primary Energy'],
+                                'Value': 578, # in EJ
+                                'Range': 0.20}, # +/- % #
+                    'Nuclear electricity': {'Variables':['Secondary Energy|Electricity|Nuclear'],
+                                'Value': 9.77, # in %
+                                'Range': 0.30}, # +/- % #
+                    'Solar and wind': {'Variables':['Secondary Energy|Wind', 'Secondary Energy|Solar'],
+                                'Value': 8.51, # in %
+                                'Range': 0.50}} # +/- % #
+
+VETTING_VARS = ['Emissions|CO2', 'Emissions|CH4', 'Primary Energy',
+                'Secondary Energy|Electricity|Nuclear', 'Secondary Energy|Wind', 'Secondary Energy|Solar']
 
 # Error Messages
 ERROR_FILE_NOT_FOUND = "The requested file could not be found."

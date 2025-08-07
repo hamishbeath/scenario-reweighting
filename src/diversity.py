@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import wquantiles
 import copy
+import os
 import json
 from tqdm import tqdm
 from constants import *
@@ -16,27 +17,72 @@ def main():
 
     # load the data
     # data_for_diversity = read_csv(INPUT_DIR + 'sci_pathways.csv')
-    # ar6_tier_0_data = read_csv(INPUT_DIR + 'ar6_pathways_tier0.csv')
-    # # sigma_values = calculate_sigma_SSP_RCP(ar6_tier_0_data, SSP_SCENARIOS, TIER_0_VARIABLES)
-    # # sigma_values.to_csv(OUTPUT_DIR + 'sigma_value_ar6.csv', index=False)
+    
+    """
+    Run the sigma calculation for the AR6 pathways.
+    """
+    
+    ar6_tier_0_data = read_csv(INPUT_DIR + 'ar6_pathways_tier0.csv')
+    # sigma_values = calculate_sigma_SSP_RCP(ar6_tier_0_data, SSP_SCENARIOS, TIER_0_VARIABLES)
+    # sigma_values.to_csv(OUTPUT_DIR + 'sigma_value_0.00_1.00.csv', index=False)
+    
     # # calculate_pairwise_rms_distances(data_for_diversity, TIER_0_VARIABLES, 'sci', start_year=2020, end_year=2100)
     
+    """
+    Run the variable weights calculation for the AR6 pathways in a loop.
+    """
     # pairwise_rms = read_csv(OUTPUT_DIR + 'pairwise_rms_distances_ar6.csv')
     # sigma_values = read_csv(OUTPUT_DIR + 'sigma_value_ar6.csv')
-    
-    # sigma_string = 'q3'
-    # sigma_value = sigma_values.set_index('Variable')[sigma_string].to_dict()
+    # sigmas_values = sigma_values.set_index('Variable')
+    # # sigmas_to_run = np.arange(0.05, 0.95, 0.05)
+    # sigmas_to_run = ['0.00', '1.00']
+    # for sigma in tqdm(sigmas_to_run):
 
-    # scenario_variable_weights = calculate_variable_weights(pairwise_rms, sigma_value, 'ar6', sigma_string + '_sigma', return_df=True)
-    # # scenario_variable_weights = read_csv(OUTPUT_DIR + 'variable_weights_ar6_ar6_median_weights.csv')
-    # calculate_composite_weight(scenario_variable_weights, ar6_tier_0_data, VARIABLE_INFO, 'ar6_' + sigma_string + '_sigma', raw=False, normalise=False)
+    #     if isinstance(sigma, float):
+    #         sigma_string = f"{sigma:.2f}"
+    #     else:
+    #         sigma_string = sigma
+    #     # sigma_string = f"{sigma:.2f}"
+    #     # if str(sigma) in exclude:
+    #     #     continue
+        
+    #     sigma_variables = sigmas_values[sigma_string].to_dict()
+    #     print(sigma_variables)
+    #     calculate_variable_weights(pairwise_rms, sigma_variables, 'ar6', sigma_string + '_sigma', return_df=True)
+    #     print(f"Variable weights calculated for sigma {sigma_string}")
+
+#     sigma_value = sigma_values.set_index('Variable')[sigma_string].to_dict()
+    # scenario_variable_weights = calculate_variable_weights(pairwise_rms, sigma_value, 'ar6', sigma_string + '_sigma', return_df=False)
+    
+
+    sigma_string = '0.70'
+    scenario_variable_weights = read_csv(OUTPUT_DIR + 'variable_weights_ar6_ar6_median_weights.csv')
+    calculate_composite_weight(scenario_variable_weights, ar6_tier_0_data, 
+                               VARIABLE_INFO, 'ar6_' + sigma_string + '_sigma_expert_weights')
+
 
     # coal_data = read_csv('~/Library/Mobile Documents/com~apple~CloudDocs/societal-transition-pathways/plotting_data_AR6_coal.csv')
     # meta = read_csv(INPUT_DIR + 'ar6_meta_data.csv')
     # coal_data_with_meta = add_meta_cols(coal_data,  meta, metacols=['Category', 'Category_subset'])
     # coal_data_with_meta.to_csv('~/Library/Mobile Documents/com~apple~CloudDocs/societal-transition-pathways/plotting_data_AR6_coal.csv', index=False)
-    sigma_tests = ['min', 'q1', 'median', 'q3', 'max']
-    determine_sigma_greatest_diversity('ar6', sigma_tests, TIER_0_VARIABLES)
+    # sigmas_to_run = np.arange(0.0, 1.05, 0.05).tolist()
+    # sigmas_to_run = [f"{sigma:.2f}" for sigma in sigmas_to_run]
+    # determine_sigma_greatest_diversity('ar6', sigmas_to_run, TIER_0_VARIABLES)
+    # variable_data = add_meta_cols(ar6_tier_0_data, meta, metacols=['Category'])
+
+    # for category in variable_data['Category'].unique():
+    #     print(f"Calculating correlation for category: {category}")
+    #     category_data = variable_data[variable_data['Category'] == category]
+    #     get_snapshot_variable_correlation(category_data, TIER_0_VARIABLES, f'ar6_snapshot_{category}')
+    
+    
+    # test_correlation(variable_data, ['Carbon Sequestration|CCS', 'Primary Energy|Non-Biomass Renewables'])
+    # get_snapshot_variable_correlation(variable_data, TIER_0_VARIABLES, 'ar6_snapshot')
+
+    correlation_matrix_global = pd.read_csv(OUTPUT_DIR + 'variable_correlation_matrix_ar6_snapshot_SNAPSHOT.csv', index_col=0)
+    new_variable_weights = compute_weights_flat(correlation_matrix_global)
+    print(new_variable_weights)
+
 
 # Function to Calculate sigma values
 def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables):
@@ -98,31 +144,37 @@ def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables):
             if not pairwise_rms_dists:
                 continue
 
+        quantiles_to_run = 0.00, 1.00
+
         # Calculate summary statistics
-        quantiles = np.quantile(pairwise_rms_dists, QUANTILE_LEVELS)
+        # quantiles = np.quantile(pairwise_rms_dists, QUANTILE_LEVELS)
+        quantiles = np.quantile(pairwise_rms_dists, quantiles_to_run)
         min_diff = np.min(pairwise_rms_dists)
         max_diff = np.max(pairwise_rms_dists)
 
-        sigma_dict[variable] = {
-            'min': min_diff,
-            '5th': quantiles[0],
-            'q1': quantiles[1],
-            'median': quantiles[2],
-            'q3': quantiles[3],
-            '95th': quantiles[4],
-            'max': max_diff
-        }
+        # sigma_dict[variable] = {
+        #     'min': min_diff,
+        #     '5th': quantiles[0],
+        #     'q1': quantiles[1],
+        #     'median': quantiles[2],
+        #     'q3': quantiles[3],
+        #     '95th': quantiles[4],
+        #     'max': max_diff
+        # }
+        sigma_dict[variable] = {f"{q:.2f}": quantiles[i] for i, q in enumerate(quantiles_to_run)}
+        sigma_dict[variable]['max'] = max_diff
+        sigma_dict[variable]['min'] = min_diff
 
     # sigma_dict to dataframe
     sigma_values = pd.DataFrame.from_dict(sigma_dict, orient='index').reset_index()
-    sigma_values.columns = ['Variable', 'min', '5th', 'q1', 'median', 'q3', '95th', 'max']
+    # sigma_values.columns = ['Variable', 'min', '5th', 'q1', 'median', 'q3', '95th', 'max']
+    sigma_values = sigma_values.rename(columns={'index': 'Variable'})
 
     # Print results
     print(sigma_values)
     return sigma_values
 
-
-
+# Function that calculates pairwise RMS distances for each variable in the data
 def calculate_pairwise_rms_distances(data, variables, database, start_year=2020, end_year=2100):
     """
     Function that returns a DataFrame with pairwise RMS distances for each variable, for each
@@ -212,15 +264,16 @@ def rms(i, j):
     return np.sqrt(np.mean((i - j) ** 2))
 
 
+
 # Function that reweights the scenarios based on the pairwise RMS distances and the signma input
-def calculate_variable_weights(pairwise_rms_df, sigma, database, output_id, return_df=False):
+def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, return_df=False):
 
     """
     Calculate weights for each variable and scenario based on pairwise RMS distances and sigma values.
 
     Inputs:
         pairwise_rms_df (DataFrame): DataFrame containing pairwise RMS distances.
-        sigma (DataFrame): DataFrame containing sigma values for each variable.
+        sigmas (DataFrame): DataFrame containing sigma values for each variable.
         database (str): The database to use for the analysis 
         output_id (str): Identifier for the output file.
 
@@ -246,7 +299,7 @@ def calculate_variable_weights(pairwise_rms_df, sigma, database, output_id, retu
     # loop through each variable 
     for variable in tqdm(variables, desc="Calculating weights by variable"):
         var_df = pairwise_rms_df[pairwise_rms_df['Variable'] == variable]
-        variable_sigma = sigma[variable] # lifts variable sigma from the dict
+        variable_sigma = sigmas[variable] # lifts variable sigma from the dict
 
         # Initialise distance matrix
         dist_matrix = np.full((n, n), np.nan)
@@ -288,8 +341,10 @@ def calculate_variable_weights(pairwise_rms_df, sigma, database, output_id, retu
         return variable_weights_df
 
 
+
 # combines the weights from each of the variables using the group and sub-group weights
-def calculate_composite_weight(weighting_data_file, original_scenario_data, variable_info, output_id, raw=False, normalise=False):
+def calculate_composite_weight(weighting_data_file, original_scenario_data, output_id, variable_info=VARIABLE_INFO, 
+                               flat_weights=None):
 
     """
     Function that combines the weights from each of the variables using the group and sub-group weights. Allows for underreporting
@@ -298,8 +353,10 @@ def calculate_composite_weight(weighting_data_file, original_scenario_data, vari
     Inputs:
         wieghting_data_file (DataFrame): DataFrame containing the weights for each variable and scenario.
         original_scenario_data (DataFrame): DataFrame containing the original scenario data - used to check for variable reporting
-        group_weights (dict): Dictionary containing the weights for each group.
-        sub_group_weights (dict): Dictionary containing the weights for each sub-group.
+        output_id (str): Identifier for the output file.
+        variable_info (dict): Dictionary containing the weights for each group/sub-group. Default is the global VARIABLE_INFO.
+        flat_weights (dict): Optional dictionary containing flat weights for each variable. If provided, this will override the variable_info weights and
+        ignore the group and sub-group weights.
     
     Outputs:
         DataFrame: A DataFrame containing the combined weights for each scenario and variable.    
@@ -312,10 +369,16 @@ def calculate_composite_weight(weighting_data_file, original_scenario_data, vari
 
     scenario_models = original_scenario_data['scen_model'].unique()
 
-    # Convert to DataFrame
-    variable_df = pd.DataFrame.from_dict(variable_info, orient='index').reset_index()
-    variable_df = variable_df.rename(columns={'index': 'Variable'})
-    variable_df['variable_weight'] = variable_df['group_weight'] * variable_df['subgroup_weight']
+    if flat_weights is not None:
+        variable_df = pd.DataFrame.from_dict(flat_weights, orient='index').reset_index()
+        variable_df = variable_df.rename(columns={'index': 'Variable'})
+        variable_df['variable_weight'] = variable_df['Variable']
+
+    else:
+        # Convert to DataFrame
+        variable_df = pd.DataFrame.from_dict(variable_info, orient='index').reset_index()
+        variable_df = variable_df.rename(columns={'index': 'Variable'})
+        variable_df['variable_weight'] = variable_df['group_weight'] * variable_df['subgroup_weight']
 
     scenarios = []
     models = []
@@ -345,9 +408,9 @@ def calculate_composite_weight(weighting_data_file, original_scenario_data, vari
             variable_df = variable_df.rename(columns={'index': 'Variable'})
             variable_df['variable_weight'] = variable_df['group_weight'] * variable_df['subgroup_weight']
     
-        if raw:
-            # if raw is True, we just want to use the raw weights
-            scenario_weighting_data['Weight'] = scenario_weighting_data['Raw Weight']
+        # if raw:
+        #     # if raw is True, we just want to use the raw weights
+        #     scenario_weighting_data['Weight'] = scenario_weighting_data['Raw Weight']
         
         scenario_weighting_data = scenario_weighting_data.merge(
             variable_df[['Variable', 'variable_weight']],
@@ -510,6 +573,255 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
         #     plt.show()
 
 
+# Determine variable weights based on their correlation with each other
+def get_variable_correlation_matrix(variable_data, variables, output_id): 
+   
+    """
+    This function performs analysis assessing the correlation for each of our 15 variables, for each scenario. 
+    So, for each scenario, we calculate the correlation between each pair of variables. This takes the timeseries
+    data 2020:2100, and calculates the correlation for each pair of variables across the years.
 
+    These correlations can then be averaged across all scenarios, or by temperature category.
+
+    The resulting correlation matrix can then be used to determine the weights for each variable. This can be
+    done at the variable group level, or at the single variable level.
+    
+    Parameters:
+    - variable_data (DataFrame): The scenario data containing the tier 0 variable data, timeseries data 2020:2100.
+    - variables (list): List of variables to calculate correlation for.
+    - variable_groups (dict): Dictionary containing the variable groups and their weights.
+
+    returns:
+    - a matrix of average correlations for each variable, for the whole dataset, and by individual temperature category. 
+    
+    """
+
+    # Ensure the data is a DataFrame
+    if not isinstance(variable_data, pd.DataFrame):
+        raise TypeError("Input data must be a pandas DataFrame.")
+   
+   # Check variables is a list with at least two items
+    if not isinstance(variables, list) or len(variables) < 2:
+        raise ValueError("Variables must be a list with at least two items.")
+   
+    # Ensure the output_id is a string
+    if not isinstance(output_id, str):
+        raise TypeError("Output ID must be a string.")
+    
+    # Check for required columns
+    required_columns = ['Scenario', 'Model', 'Variable', 'Category']
+    year_columns = [str(y) for y in range(2020, 2101, 10)]
+    
+    if not all(col in variable_data.columns for col in required_columns + year_columns):
+        raise ValueError(f"Input data must contain columns: {required_columns + year_columns}")
+    
+    # Filter to only desired variables
+    df = variable_data[variable_data['Variable'].isin(variables)].copy()
+
+    # Group by scenario identifiers
+    scenario_groups = df.groupby(['Scenario', 'Model', 'Region', 'Unit'])
+
+    scenario_corrs = {}            # {scenario_key: correlation matrix}
+    scenario_categories = {}       # {scenario_key: category}
+
+    for scenario_key, group in tqdm(scenario_groups):
+        category = group['Category'].iloc[0]
+        scenario_categories[scenario_key] = category
+
+        # Create a matrix: rows = years, columns = variables
+        var_data = group.set_index('Variable')[year_columns].T  # Now rows=years, columns=variables
+
+        # Drop variables (columns) with all NaNs
+        var_data = var_data.dropna(axis=1, how='all')
+
+        if var_data.shape[1] < 2:
+            continue  # Need at least 2 variables to compute correlation
+
+        corr = var_data.astype(float).corr()
+        scenario_corrs[scenario_key] = corr
+
+    # Combine all correlations and compute global average
+    all_corrs = pd.concat(scenario_corrs.values(), keys=scenario_corrs.keys())
+    mean_corr = all_corrs.groupby(level=1).mean()
+    mean_corr.to_csv(os.path.join(OUTPUT_DIR, f'variable_correlation_matrix_{output_id}_GLOBAL.csv'))
+
+    # Compute category-specific means
+    category_corrs = {}
+    for scenario_key, corr in scenario_corrs.items():
+        category = scenario_categories[scenario_key]
+        category_corrs.setdefault(category, []).append(corr)
+
+    mean_corrs_by_category = {}
+    for category, corr_list in category_corrs.items():
+        aligned_corrs = pd.concat(corr_list, keys=range(len(corr_list)))
+        mean_corr_cat = aligned_corrs.groupby(level=1).mean()
+        mean_corrs_by_category[category] = mean_corr_cat
+
+        filename = f'variable_correlation_matrix_{output_id}_CATEGORY_{category.replace(" ", "_")}.csv'
+        mean_corr_cat.to_csv(os.path.join(OUTPUT_DIR, filename))
+
+    return scenario_corrs
+
+
+
+def get_snapshot_variable_correlation(variable_data, variables, output_id):
+    """
+    Calculates variable correlation matrices based on snapshots in time (e.g. decadal values).
+    For each year, we compute correlation across scenarios between variables. Then we average the
+    correlation matrices over time to get a single correlation matrix.
+
+    Parameters:
+    - variable_data (DataFrame): The scenario data with timeseries columns (e.g. 2020 to 2100).
+    - variables (list): List of variable names to include.
+    - output_id (str): ID for naming output files.
+
+    Returns:
+    - mean_corr: DataFrame of average correlations across all years.
+    - yearly_corrs: Dictionary of year -> correlation matrix
+    """
+    
+    # --- Validation ---
+    if not isinstance(variable_data, pd.DataFrame):
+        raise TypeError("Input data must be a pandas DataFrame.")
+    
+    if not isinstance(variables, list) or len(variables) < 2:
+        raise ValueError("Variables must be a list with at least two items.")
+    
+    if not isinstance(output_id, str):
+        raise TypeError("Output ID must be a string.")
+
+    required_columns = ['Scenario', 'Model', 'Variable']
+    year_columns = [str(y) for y in range(2020, 2101, 10)]
+
+    if not all(col in variable_data.columns for col in required_columns + year_columns):
+        raise ValueError(f"Missing required columns: {required_columns + year_columns}")
+
+    # --- Filter and reshape data ---
+    df = variable_data[variable_data['Variable'].isin(variables)].copy()
+
+    # Create unique scenario ID
+    df['Scenario_ID'] = df['Scenario'] + '|' + df['Model'] 
+
+    yearly_corrs = {}
+
+    for year in year_columns:
+        
+        year_df = df[['Scenario_ID', 'Variable', year]].copy()
+        year_df = year_df.pivot(index='Scenario_ID', columns='Variable', values=year)
+
+        # Compute correlation between variables across scenarios
+        corr_matrix = year_df.corr()
+        yearly_corrs[year] = corr_matrix
+
+    # average the correlation matrices across all years
+    aligned_corrs = pd.concat(yearly_corrs.values(), keys=yearly_corrs.keys())
+    mean_corr = aligned_corrs.groupby(level=1).mean()
+
+    
+    mean_corr.to_csv(os.path.join(OUTPUT_DIR, f'variable_correlation_matrix_{output_id}_SNAPSHOT.csv'))
+    yearly_corrs_df = pd.concat(yearly_corrs, axis=0)
+    yearly_corrs_df.to_csv(os.path.join(OUTPUT_DIR, f'variable_correlation_matrix_{output_id}_SNAPSHOT_YEARLY.csv'))
+    return mean_corr, yearly_corrs
+
+
+
+# Function to compute weights while preserving group structure
+def compute_weights_preserve_group(corr_matrix, variable_info):
+    group_vars = {}
+    for var, info in variable_info.items():
+        group_vars.setdefault(info['group'], []).append(var)
+
+    final_weights = {}
+
+    for group, variables in group_vars.items():
+        # Subset correlation matrix for group
+        sub_corr = corr_matrix.loc[variables, variables]
+
+        # Compute redundancy score (sum of correlations per variable)
+        redundancy = sub_corr.sum(axis=1)
+
+        # Invert: higher score = more independent
+        informativeness = 1 / redundancy.replace(0, np.nan)
+
+        # Replace NaNs (fully independent) with max informativeness
+        informativeness = informativeness.fillna(informativeness.max())
+
+        # Normalise within group
+        informativeness_weights = informativeness / informativeness.sum()
+
+        for var in variables:
+            subgroup_weight = variable_info[var]['subgroup_weight']
+            group_weight = variable_info[var]['group_weight']
+            adjusted_subgroup_weight = informativeness_weights[var]
+
+            final_weights[var] = group_weight * adjusted_subgroup_weight
+
+    # Normalise to sum to 1
+    total = sum(final_weights.values())
+    final_weights = {k: v / total for k, v in final_weights.items()}
+    return final_weights
+
+
+
+def compute_weights_flat(corr_matrix):
+
+
+    # Correlations calculated
+    # avg_corr = corr_matrix.abs().mean()
+
+    squared_corr = corr_matrix.pow(2).mean()
+
+    # Inverse of redundancy (more unique variables get higher weights)
+    inverse_redundancy = 1 / squared_corr
+
+    # Normalise to probability distribution
+    weights = inverse_redundancy / inverse_redundancy.sum()
+    return weights.to_dict()
+ 
+
+def test_correlation(input_df, variables, category_filter=None):
+    """
+    Test the correlation function with a sample DataFrame and variables.
+    
+    Parameters:
+    input_df (DataFrame): Sample DataFrame containing scenario data.
+    variables (list): List of variables to test.
+    category_filter (str): Category to filter the data by.
+    
+    Returns:
+    None
+    """
+    if category_filter is None:
+        category_filter = category_filter
+
+    variable_input_df = input_df[input_df['Variable'].isin(variables)]
+    correlations = []
+
+    year_cols = [str(year) for year in range(2020, 2101, 10)]
+
+    for i, (scenario, model) in enumerate(zip(input_df['Scenario'], input_df['Model'])):
+
+        # Filter the DataFrame for the current scenario and model
+        filtered_df = input_df[(input_df['Scenario'] == scenario) & (input_df['Model'] == model)]
+
+        variable_1_timeseries = filtered_df[filtered_df['Variable'] == variables[0]][year_cols].values
+        variable_2_timeseries = filtered_df[filtered_df['Variable'] == variables[1]][year_cols].values
+        
+        # Check if both variables have data
+        if variable_1_timeseries.size == 0 or variable_2_timeseries.size == 0:
+            continue
+        # Calculate the correlation
+
+        correlation = np.corrcoef(variable_1_timeseries, variable_2_timeseries)[0][1]
+        if np.isnan(correlation):
+            continue
+        correlations.append(correlation)
+
+    average_correlation = np.mean(correlations)
+    print(f"Average correlation between {variables[0]} and {variables[1]}: {average_correlation}")
+
+
+  
+  
 if __name__ == "__main__":
     main()

@@ -46,6 +46,8 @@ def data_download_sub(variables, models, scenarios, categories, region, end_year
         df = database_connection.query(model=models, scenario=scenarios, Category=categories,
         variable=variables, region=region, year=range(2020, end_year+1)
         )
+        df = df.filter(Category=categories)
+
     if database == 'sci':
         
         platform = ixmp4.Platform("scenariocompass-dev")
