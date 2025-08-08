@@ -53,35 +53,31 @@ def main():
 
 #     sigma_value = sigma_values.set_index('Variable')[sigma_string].to_dict()
     # scenario_variable_weights = calculate_variable_weights(pairwise_rms, sigma_value, 'ar6', sigma_string + '_sigma', return_df=False)
+    """
+    Composite weights calculation for the AR6 pathways.
+
+    """
+    sigma_string = '0.00'
+    # scenario_variable_weights = read_csv(OUTPUT_DIR + 'variable_weights_ar6_ar6_median_weights.csv')
     
-
-    sigma_string = '0.70'
-    scenario_variable_weights = read_csv(OUTPUT_DIR + 'variable_weights_ar6_ar6_median_weights.csv')
+    scenario_variable_weights = read_csv(OUTPUT_DIR + f'variable_weights_ar6_{sigma_string}_sigma.csv')
     calculate_composite_weight(scenario_variable_weights, ar6_tier_0_data, 
-                               VARIABLE_INFO, 'ar6_' + sigma_string + '_sigma_expert_weights')
+                               'ar6_' + sigma_string + '_sigma_energy_weights', VARIABLE_INFO_ENERGY, flat_weights=None)
 
 
-    # coal_data = read_csv('~/Library/Mobile Documents/com~apple~CloudDocs/societal-transition-pathways/plotting_data_AR6_coal.csv')
     # meta = read_csv(INPUT_DIR + 'ar6_meta_data.csv')
-    # coal_data_with_meta = add_meta_cols(coal_data,  meta, metacols=['Category', 'Category_subset'])
-    # coal_data_with_meta.to_csv('~/Library/Mobile Documents/com~apple~CloudDocs/societal-transition-pathways/plotting_data_AR6_coal.csv', index=False)
-    # sigmas_to_run = np.arange(0.0, 1.05, 0.05).tolist()
-    # sigmas_to_run = [f"{sigma:.2f}" for sigma in sigmas_to_run]
-    # determine_sigma_greatest_diversity('ar6', sigmas_to_run, TIER_0_VARIABLES)
     # variable_data = add_meta_cols(ar6_tier_0_data, meta, metacols=['Category'])
 
     # for category in variable_data['Category'].unique():
     #     print(f"Calculating correlation for category: {category}")
     #     category_data = variable_data[variable_data['Category'] == category]
     #     get_snapshot_variable_correlation(category_data, TIER_0_VARIABLES, f'ar6_snapshot_{category}')
-    
-    
+
     # test_correlation(variable_data, ['Carbon Sequestration|CCS', 'Primary Energy|Non-Biomass Renewables'])
     # get_snapshot_variable_correlation(variable_data, TIER_0_VARIABLES, 'ar6_snapshot')
-
-    correlation_matrix_global = pd.read_csv(OUTPUT_DIR + 'variable_correlation_matrix_ar6_snapshot_SNAPSHOT.csv', index_col=0)
-    new_variable_weights = compute_weights_flat(correlation_matrix_global)
-    print(new_variable_weights)
+    # correlation_matrix_global = pd.read_csv(OUTPUT_DIR + 'variable_correlation_matrix_ar6_snapshot_SNAPSHOT.csv', index_col=0)
+    # new_variable_weights = compute_weights_flat(correlation_matrix_global)
+    # print(new_variable_weights)
 
 
 # Function to Calculate sigma values
@@ -264,7 +260,6 @@ def rms(i, j):
     return np.sqrt(np.mean((i - j) ** 2))
 
 
-
 # Function that reweights the scenarios based on the pairwise RMS distances and the signma input
 def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, return_df=False):
 
@@ -341,7 +336,6 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, ret
         return variable_weights_df
 
 
-
 # combines the weights from each of the variables using the group and sub-group weights
 def calculate_composite_weight(weighting_data_file, original_scenario_data, output_id, variable_info=VARIABLE_INFO, 
                                flat_weights=None):
@@ -372,7 +366,7 @@ def calculate_composite_weight(weighting_data_file, original_scenario_data, outp
     if flat_weights is not None:
         variable_df = pd.DataFrame.from_dict(flat_weights, orient='index').reset_index()
         variable_df = variable_df.rename(columns={'index': 'Variable'})
-        variable_df['variable_weight'] = variable_df['Variable']
+        variable_df['variable_weight'] = variable_df[0]
 
     else:
         # Convert to DataFrame
@@ -779,46 +773,8 @@ def compute_weights_flat(corr_matrix):
     return weights.to_dict()
  
 
-def test_correlation(input_df, variables, category_filter=None):
-    """
-    Test the correlation function with a sample DataFrame and variables.
-    
-    Parameters:
-    input_df (DataFrame): Sample DataFrame containing scenario data.
-    variables (list): List of variables to test.
-    category_filter (str): Category to filter the data by.
-    
-    Returns:
-    None
-    """
-    if category_filter is None:
-        category_filter = category_filter
 
-    variable_input_df = input_df[input_df['Variable'].isin(variables)]
-    correlations = []
 
-    year_cols = [str(year) for year in range(2020, 2101, 10)]
-
-    for i, (scenario, model) in enumerate(zip(input_df['Scenario'], input_df['Model'])):
-
-        # Filter the DataFrame for the current scenario and model
-        filtered_df = input_df[(input_df['Scenario'] == scenario) & (input_df['Model'] == model)]
-
-        variable_1_timeseries = filtered_df[filtered_df['Variable'] == variables[0]][year_cols].values
-        variable_2_timeseries = filtered_df[filtered_df['Variable'] == variables[1]][year_cols].values
-        
-        # Check if both variables have data
-        if variable_1_timeseries.size == 0 or variable_2_timeseries.size == 0:
-            continue
-        # Calculate the correlation
-
-        correlation = np.corrcoef(variable_1_timeseries, variable_2_timeseries)[0][1]
-        if np.isnan(correlation):
-            continue
-        correlations.append(correlation)
-
-    average_correlation = np.mean(correlations)
-    print(f"Average correlation between {variables[0]} and {variables[1]}: {average_correlation}")
 
 
   

@@ -14,7 +14,7 @@ from utils import read_csv, add_meta_cols, model_family, data_download_sub
 # Set up global plot params
 plt.rcParams['font.size'] = 7
 plt.rcParams['axes.titlesize'] = 7
-# plt.rcParams['figure.dpi'] = 150
+plt.rcParams['figure.dpi'] = 150
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['Helvetica']
 plt.rcParams['xtick.direction'] = 'in'
@@ -35,21 +35,21 @@ def main() -> None:
     # harmonised_emissions_data = read_csv('inputs/AR6_harmonised_emissions_data.csv')
     # # df_results = read_csv('outputs/composite_weights_ar6_q3_sigma.csv')
     ar6_meta = read_csv('inputs/ar6_meta_data')
-    # harmonised_emissions_data = add_meta_cols(harmonised_emissions_data, ar6_meta, ['Category', 'Category_subset'])
+    # # harmonised_emissions_data = add_meta_cols(harmonised_emissions_data, ar6_meta, ['Category', 'Category_subset'])
     
     # ar6_meta = ar6_meta.reset_index()
-    model_family_df = read_csv('inputs/model_family.csv')
-    # df_results = read_csv('outputs/variable_weights_ar6_q3_sigma.csv')
-    df_results = read_csv('outputs/quality_weights_ar6.csv')
-    df_results = add_meta_cols(df_results, ar6_meta, ['Category', 'Project_study'])
-    # df_quality_input = read_csv('outputs/quality_weighting_data.csv')
-    # df_results['Project'] = df_results['Project_study']
-    df_results = model_family(df_results, model_family_df)
+    # model_family_df = read_csv('inputs/model_family.csv')
+    # # df_results = read_csv('outputs/variable_weights_ar6_q3_sigma.csv')
+    # df_results = read_csv('outputs/quality_weights_ar6.csv')
+    # df_results = add_meta_cols(df_results, ar6_meta, ['Category', 'Project_study'])
+    # # df_quality_input = read_csv('outputs/quality_weighting_data.csv')
+    # # df_results['Project'] = df_results['Project_study']
+    # df_results = model_family(df_results, model_family_df)
     # print(df_results)
     # create_database_impact_variable(df_results, 'Primary Energy|Coal', GROUP_MODES)
     # # plot_timeseries(df_results, harmonised_emissions_data)
     # # df_results = read_csv('outputs/relevance_weighting.csv')
-    # timeseries_data = read_csv('inputs/ar6_pathways_tier0.csv')
+    timeseries_data = read_csv('inputs/ar6_pathways_tier0.csv')
     # plot_timeseries(df_results, harmonised_emissions_data)
     # variable_weight_subplots_sigma_sensitivity(sigmas, timeseries_data, TIER_0_VARIABLES, categories=['C1', 'C2'], meta=ar6_meta)
     # plot_relevance_against_meta(df_results, ar6_meta, ['C1', 'C2'], RELEVANCE_VARIABLES, CATEGORY_COLOURS_DICT, harmonised_emissions_data)
@@ -68,9 +68,27 @@ def main() -> None:
     #                              variables_year=[2050, None], categories=CATEGORIES_ALL)
 
     """
+    Violin plots
+    """
+    sigma = '0.70'
+    weighting_approach = 'energy'
+    weights = read_csv(OUTPUT_DIR + f'composite_weights_ar6_{sigma}_sigma_{weighting_approach}_weights.csv')
+    # ar6_data = read_csv(INPUT_DIR + 'ar6_data_with_plotting_meta.csv')
+
+    # # add the weight column to the ar6_data
+    # ar6_data = ar6_data.set_index(['Model', 'Scenario'])
+    # ar6_data['Weight'] = ar6_data.index.map(weights.set_index(['Model', 'Scenario'])['Weight'])
+    # ar6_data = ar6_data.reset_index()
+
+    # violin_plots(ar6_data, ['C1', 'C1a_NZGHGs', 'C2'])
 
     """
-    histogram_quality_weighting(df_results, ['Model_family', 'Project_study'], categories=['C1', 'C2'])
+    Timeseries weight plots
+    """
+    variable_weight_subplots_composite(weights, 
+                                        timeseries_data, TIER_0_VARIABLES, 
+                                        categories=['C1', 'C2'], meta=ar6_meta)
+
 
 
 
@@ -342,7 +360,6 @@ def create_database_impact_variable(results, variable, grouping_modes,categories
         axs[i].set_ylim(0, MODES_YMAX[mode])
         
     plt.show()
-
 
 
 def plot_timeseries(df_results, harmonised_emissions_data):
@@ -626,6 +643,116 @@ def plot_timeseries(df_results, harmonised_emissions_data):
 
 
 # Function that takes the variable weights individually, and applies them to each of the variables
+def variable_weight_subplots_composite(composite_weights_data, 
+                                       timeseries_data, variables, 
+                                       categories=None, meta=None):
+    """
+    Function that creates subplots for each variable showing a line and IQR for the 
+    weighted and unweighed variable. This function uses the weights calculated for 
+    each variable rather than the composite weight and is used for diagnostics.
+    
+    Inputs: 
+    composite_weights_data: a dataframe containing the weights for each variable 
+    timeseries_data: a dataframe containing the timeseries data for each variable, and each scenario
+    variables: a list of variables to plot, these should be the columns in the composite_weights_data dataframe
+    categories: a list of categories to filter the data by, if None, all categories are used
+    meta: a dataframe containing the metadata for the variables, if None, the metadata is not
+
+    """
+
+    # set up the params
+    plt.rcParams['xtick.minor.visible'] = True
+    plt.rcParams['ytick.direction'] = 'in'
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.major.left'] = True
+    plt.rcParams['ytick.major.right'] = True
+    # plt.rcParams['ytick.minor.visible'] = True
+    plt.rcParams['xtick.top'] = True
+    plt.rcParams['ytick.right'] = True
+    plt.rcParams['axes.linewidth'] = 0.75
+
+    if categories != None: # check whether the variable weights data has the category as metadata
+        if 'Category' not in composite_weights_data.columns:
+            if meta is None:
+                raise ValueError("Meta data must be provided if 'Category' is not in composite_weights_data columns.")
+            composite_weights_data = add_meta_cols(composite_weights_data, meta, ['Category', 'Category_subset'])
+        composite_weights_data = composite_weights_data[composite_weights_data['Category'].isin(categories)]
+
+    # join the variable weights (left) to the timeseries (right), joining on the scenario and model columns
+    variable_data_timeseries = pd.merge(
+        composite_weights_data, 
+        timeseries_data, 
+        on=['Model', 'Scenario'], 
+        how='left'
+    )
+
+   # set up the figure
+    fig, axs = plt.subplots(5, 3, figsize=(7.08, 7.08), facecolor='white', sharex=True)
+
+    # flatten the axes array
+    axs = axs.flatten()
+    
+    # year cols 2020-2100, decadal
+    year_cols = [str(year) for year in range(2020, 2101, 10)]
+
+    # loop through the variables and plot the data
+    for i, variable in enumerate(variables):
+
+        unit = timeseries_data.loc[timeseries_data['Variable']==variable, 'Unit'].unique()
+
+        variable_data = variable_data_timeseries[variable_data_timeseries['Variable']==variable]
+        median_timeseries = variable_data[year_cols].median(axis=0)
+        lower_q_timeseries = variable_data[year_cols].quantile(0.25, axis=0)
+        upper_q_timeseries = variable_data[year_cols].quantile(0.75, axis=0)
+
+        weighted_median = []
+        weighted_lower_q = []
+        weighted_upper_q = []
+
+        # remove nans
+        variable_data = variable_data.dropna(subset=year_cols + ['Weight'])
+    
+        for year in year_cols:
+            
+            # calculate the weighted median and IQR for each year
+            weighted_median.append(wquantiles.median(variable_data[year], -variable_data['Weight']))
+            weighted_lower_q.append(wquantiles.quantile(variable_data[year], -variable_data['Weight'], 0.25))
+            weighted_upper_q.append(wquantiles.quantile(variable_data[year], -variable_data['Weight'], 0.75))
+            
+
+        weighted_median_timeseries = pd.Series(weighted_median, index=year_cols)
+        weighted_lower_q_timeseries = pd.Series(weighted_lower_q, index=year_cols)
+        weighted_upper_q_timeseries = pd.Series(weighted_upper_q, index=year_cols)
+
+        # plot the medians
+        axs[i].plot(year_cols, median_timeseries, linestyle='--', linewidth=1, alpha=1, label='Unweighted Median')
+        axs[i].plot(year_cols, weighted_median_timeseries, linestyle='dotted', linewidth=1.2, alpha=1, label='Weighted Median', color='gold')
+        axs[i].fill_between(year_cols, lower_q_timeseries, upper_q_timeseries, color='blue', alpha=0.3, label='Unweighted IQR')
+        axs[i].fill_between(year_cols, weighted_lower_q_timeseries, weighted_upper_q_timeseries, color='gold', alpha=0.3, label='Weighted IQR')
+
+        # set the title and labels
+        axs[i].set_title(variable)
+        axs[i].set_ylabel(unit)
+        axs[i].set_xlabel('Year')
+
+        # add a, b, c, d labels to the subplots
+        axs[i].text(-0.22, 1.17, chr(97 + i), transform=axs[i].transAxes, 
+                    fontsize=6.5, fontweight='bold', va='top', ha='left')
+
+        if i == 4:
+            # add a legend to the second subplot
+            axs[i].legend(loc='upper left', frameon=False)
+
+    # set the x-axis limits
+    for ax in axs:  
+        ax.set_xlim(0, 8)
+        ax.set_xticks(year_cols)
+        ax.set_xticklabels(year_cols, rotation=45, ha='right')
+    plt.tight_layout()
+    plt.show()
+
+
+# Function that takes the variable weights individually, and applies them to each of the variables
 def variable_weight_subplots(variable_weights_data, timeseries_data, variables, categories=None, meta=None):
     """
     Function that creates subplots for each variable showing a line and IQR for the 
@@ -734,7 +861,6 @@ def variable_weight_subplots(variable_weights_data, timeseries_data, variables, 
         ax.set_xticklabels(year_cols, rotation=45, ha='right')
 
     plt.show()
-
 
 
 # Function that takes the variable weights individually, and applies them to each of the variables
@@ -883,7 +1009,6 @@ def variable_weight_subplots_sigma_sensitivity(sigmas,
     plt.show()
 
 
-
 # Function that plots a simple curve of the sigmas to the iqr ranges
 def plot_sigma_quantiles_IQR_ranges(sigma_IQR_file):
 
@@ -935,8 +1060,6 @@ def plot_sigma_quantiles_IQR_ranges(sigma_IQR_file):
     ax.legend()
     
     plt.show()
-
-
 
 
 # Function that produces boxplots for key variables for quality weighting
@@ -1039,7 +1162,7 @@ def boxplots_quality_weighting(quality_weights, timeseries_emissions, meta_data,
     plt.show()
 
 
-
+# Function that plots a histogram of the quality weights for each mode, stacked by category
 def histogram_quality_weighting(df_results, modes, categories=None):
     
     plt.rcParams['xtick.minor.visible'] = True
@@ -1084,426 +1207,453 @@ def histogram_quality_weighting(df_results, modes, categories=None):
 
 
 
-# # function that makes a series of split violin plots showing the unweighted and
-# # weighted values for a range of variables. 
-# # figure width limited to 180mm, figure height limited to 180mm. 
-# # Figure to be split into 2 rows, 3 columns, first subplot occupies two columns. 
-# def violin_plots(df_results, categories):
+
+# figure width limited to 180mm, figure height limited to 180mm. 
+# Figure to be split into 2 rows, 3 columns, first subplot occupies two columns. 
+def violin_plots(df_results, categories):
     
-#     # plt.rcParams['xtick.minor.visible'] = True
-#     plt.rcParams['ytick.direction'] = 'in'
-#     # plt.rcParams['ytick.major.left'] = True
-#     # # plt.rcParams['ytick.major.right'] = True
-#     # plt.rcParams['xtick.minor.visible'] = True
-#     plt.rcParams['xtick.top'] = True
-#     plt.rcParams['ytick.right'] = True
-#     plt.rcParams['axes.linewidth'] = 0.65
-#     # set up the figure
-#     # fig, axs = plt.subplots(2, 3, figsize=(7.08, 7.08), facecolor='white')
-#     # Create a figure
-#     fig = plt.figure(figsize=(7.08, 7.08), facecolor='white')
 
-#     # Define the GridSpec
-#     gs = GridSpec(2, 3, figure=fig)  # 2 rows, 3 columns
+    plt.rcParams['ytick.direction'] = 'in'
+    plt.rcParams['xtick.top'] = True
+    plt.rcParams['ytick.right'] = True
+    plt.rcParams['axes.linewidth'] = 0.65
 
-#     # Create subplots
-#     ax1 = fig.add_subplot(gs[0, 0:2])
-#     ax2 = fig.add_subplot(gs[1, 1:3])
-#     ax3 = fig.add_subplot(gs[0, 2])
-#     ax4 = fig.add_subplot(gs[1, 0])
-#     # ax5 = fig.add_subplot(gs[1, 2])
+    # Create a figure
+    fig = plt.figure(figsize=(7.08, 7.08), facecolor='white')
 
-#     # get the data for the first violin plot
-#     count = 0
-#     to_plot = pd.DataFrame()
+    # Define the GridSpec
+    gs = GridSpec(2, 3, figure=fig)  # 2 rows, 3 columns
+
+    # Create subplots
+    ax1 = fig.add_subplot(gs[0, 0:2])
+    ax2 = fig.add_subplot(gs[1, 1:3])
+    ax3 = fig.add_subplot(gs[0, 2])
+    ax4 = fig.add_subplot(gs[1, 0])
+    # ax5 = fig.add_subplot(gs[1, 2])
+
+    # get the data for the first violin plot
+    count = 0
+    to_plot = pd.DataFrame()
     
-#     ax1.minorticks_on()
-#     ax1.tick_params(axis='y', which='minor', length=0)
+    ax1.minorticks_on()
+    ax1.tick_params(axis='y', which='minor', length=0)
     
-#     for category in categories:
-#         print(category)
-#         if category == 'C1a_NZGHGs':
-#             data = df_results[df_results['Category_subset']==category]
+    for category in categories:
+        print(category)
+        if category == 'C1a_NZGHGs':
+            data = df_results[df_results['Category_subset']==category]
 
-#         elif category == 'C1' or 'C2':
-#             data = df_results.loc[df_results['Category']==category]
+        elif category == 'C1' or 'C2':
+            data = df_results.loc[df_results['Category']==category]
         
-#         weighted_distribution = weighted_quantiles = [wquantiles.quantile(data['Net zero CO2 year_harmonised'], data['Weight'], q) for q in np.linspace(0, 1, len(data))]
-#         unweighted_distribution = data['Net zero CO2 year_harmonised']
-#         unweighted_distribution = pd.DataFrame(unweighted_distribution)
-#         unweighted_distribution['Weighted'] = 0
-#         weighted_distribution = pd.DataFrame(weighted_distribution, columns=['Net zero CO2 year_harmonised'])
-#         weighted_distribution['Weighted'] = 1
-#         plotting_df = pd.DataFrame()
-#         plotting_df = pd.concat([unweighted_distribution, weighted_distribution], ignore_index=True, axis=0)
-#         plotting_df['x_value'] = count
-#         plotting_df['Category'] = category
-#         to_plot = pd.concat([to_plot, plotting_df], axis=0)
-#         # sns.violinplot(data=plotting_df, y='x_value', x='Net zero CO2 year_harmonised', 
-#         #             hue='Weighted', ax=axs[0, 0], split=True, linewidth=0.5, fill=False,
-#         #             inner='quart', cut=0, orient='h', palette=Plotting.category_colours_shades[count_2:count_2+2],
-#         #             positions=base_positions) 
+        weighted_distribution = weighted_quantiles = [wquantiles.quantile(data['Net zero CO2 year_harmonised'], data['Weight'], q) for q in np.linspace(0, 1, len(data))]
+        unweighted_distribution = data['Net zero CO2 year_harmonised']
+        unweighted_distribution = pd.DataFrame(unweighted_distribution)
+        unweighted_distribution['Weighted'] = 0
+        weighted_distribution = pd.DataFrame(weighted_distribution, columns=['Net zero CO2 year_harmonised'])
+        weighted_distribution['Weighted'] = 1
+        plotting_df = pd.DataFrame()
+        plotting_df = pd.concat([unweighted_distribution, weighted_distribution], ignore_index=True, axis=0)
+        plotting_df['x_value'] = count
+        plotting_df['Category'] = category
+        to_plot = pd.concat([to_plot, plotting_df], axis=0)
+        # sns.violinplot(data=plotting_df, y='x_value', x='Net zero CO2 year_harmonised', 
+        #             hue='Weighted', ax=axs[0, 0], split=True, linewidth=0.5, fill=False,
+        #             inner='quart', cut=0, orient='h', palette=Plotting.category_colours_shades[count_2:count_2+2],
+        #             positions=base_positions) 
         
-#         count += 1
-#         # count_2 += 2
+        count += 1
+        # count_2 += 2
 
-#     count_new = 3
-#     # count_2 = 0
+    count_new = 3
+    # count_2 = 0
 
-#     df_results['Normalised Weight'] = (df_results['Weight'] - df_results['Weight'].min()) / (df_results['Weight'].max() - df_results['Weight'].min())
-#     for category in categories:
-#         if category == 'C1a_NZGHGs':
-#             data = df_results[df_results['Category_subset']==category]
+    df_results['Normalised Weight'] = (df_results['Weight'] - df_results['Weight'].min()) / (df_results['Weight'].max() - df_results['Weight'].min())
+    for category in categories:
+        if category == 'C1a_NZGHGs':
+            data = df_results[df_results['Category_subset']==category]
 
-#         elif category == 'C1' or 'C2':
-#             data = df_results.loc[df_results['Category']==category]
-#         weighted_distribution = weighted_quantiles = [wquantiles.quantile(data['Net zero GHG year_harmonised'], data['Weight'], q) for q in np.linspace(0, 1, len(data))]
-#         unweighted_distribution = data['Net zero GHG year_harmonised'].values
-#         # unweighted_distribution = pd.DataFrame(unweighted_distribution, columns=['Net zero GHG year_harmonised'])
-#         unweighted_distribution = pd.DataFrame(unweighted_distribution, columns=['Net zero CO2 year_harmonised'])
-#         unweighted_distribution['Weighted'] = 0
-#         # weighted_distribution = pd.DataFrame(weighted_distribution, columns=['Net zero GHG year_harmonised'])
-#         weighted_distribution = pd.DataFrame(weighted_distribution, columns=['Net zero CO2 year_harmonised'])
-#         weighted_distribution['Weighted'] = 1
-#         plotting_df = pd.DataFrame()
-#         plotting_df = pd.concat([unweighted_distribution, weighted_distribution], ignore_index=True, axis=0)
-#         plotting_df['x_value'] = count_new
-#         to_plot = pd.concat([to_plot, plotting_df], axis=0)
-#         count_new += 1
+        elif category == 'C1' or 'C2':
+            data = df_results.loc[df_results['Category']==category]
+        weighted_distribution = weighted_quantiles = [wquantiles.quantile(data['Net zero GHG year_harmonised'], data['Weight'], q) for q in np.linspace(0, 1, len(data))]
+        unweighted_distribution = data['Net zero GHG year_harmonised'].values
+        # unweighted_distribution = pd.DataFrame(unweighted_distribution, columns=['Net zero GHG year_harmonised'])
+        unweighted_distribution = pd.DataFrame(unweighted_distribution, columns=['Net zero CO2 year_harmonised'])
+        unweighted_distribution['Weighted'] = 0
+        # weighted_distribution = pd.DataFrame(weighted_distribution, columns=['Net zero GHG year_harmonised'])
+        weighted_distribution = pd.DataFrame(weighted_distribution, columns=['Net zero CO2 year_harmonised'])
+        weighted_distribution['Weighted'] = 1
+        plotting_df = pd.DataFrame()
+        plotting_df = pd.concat([unweighted_distribution, weighted_distribution], ignore_index=True, axis=0)
+        plotting_df['x_value'] = count_new
+        to_plot = pd.concat([to_plot, plotting_df], axis=0)
+        count_new += 1
 
-#     sns.violinplot(data=to_plot, y='x_value', x='Net zero CO2 year_harmonised', 
-#             hue='Weighted', ax=ax1, split=True, linewidth=0.75, fill=True, linecolor='lightgray',
-#             inner='quart', cut=0, orient='h', palette=Plotting.category_colours_shades,
-#             gap=.02)
+    sns.violinplot(data=to_plot, y='x_value', x='Net zero CO2 year_harmonised', 
+            hue='Weighted', ax=ax1, split=True, linewidth=0.75, fill=True, linecolor='lightgray',
+            inner='quart', cut=0, orient='h', palette=CATEGORY_COLOURS_SHADES,
+            gap=.02)
 
-#     # plot a dashed line at x point 3
-#     ax1.axhline(2.5, color='black', linestyle='--', linewidth=0.5, alpha=0.5)
-#     plt.setp(ax1, yticks=[0, 1, 2, 3, 4, 5], yticklabels=['C1', 'C1a', 'C2', 'C1', 'C1a', 'C2'])
-#     ax1.set_title('Net Zero Years')
-#     ax1.set_xlabel('Year')
+    # df_results['Normalised Weight'] = (df_results['Weight'] - df_results['Weight'].min()) / (df_results['Weight'].max() - df_results['Weight'].min())
+    # for category in categories:
+    #     if category == 'C1a_NZGHGs':
+    #         data = df_results[df_results['Category_subset']==category]
+    #     elif category in ('C1', 'C2'):
+    #         data = df_results.loc[df_results['Category']==category]
+    #     # ...existing code appending to `to_plot`...
+    #     count_new += 1
+
+    # # DRAW PER-GROUP WITH A PER-CATEGORY PALETTE
+    # to_plot_groups = to_plot.groupby('x_value')
+    # for xval, sub in to_plot_groups:
+    #     # infer category label used for this row block
+    #     cat = sub['Category'].iloc[0] if 'Category' in sub.columns else categories[int(xval) % len(categories)]
+    #     # base = CATEGORY_COLOURS_DICT[cat]  # your existing base color per category
+    #     # pal = {0: sns.desaturate(base, 0.55), 1: base}  # lighter for Unweighted(0), base for Weighted(1)
+    #     pal = {0: CATEGORY_COLOURS_SHADES_DICT[cat][0], 1: CATEGORY_COLOURS_SHADES_DICT[cat][1]}
+
+    #     sns.violinplot(
+    #         data=sub,
+    #         y='x_value',
+    #         x='Net zero CO2 year_harmonised',
+    #         hue='Weighted',
+    #         split=True,
+    #         ax=ax1,
+    #         linewidth=0.75,
+    #         fill=True,
+    #         linecolor='lightgray',
+    #         inner='quart',
+    #         cut=0,
+    #         orient='h',
+    #         palette=pal,
+    #         gap=.02,
+    #     )
+
+    # plot a dashed line at x point 3
+    ax1.axhline(2.5, color='black', linestyle='--', linewidth=0.5, alpha=0.5)
+    plt.setp(ax1, yticks=[0, 1, 2, 3, 4, 5], yticklabels=['C1', 'C1a', 'C2', 'C1', 'C1a', 'C2'])
+    ax1.set_title('Net Zero Years')
+    ax1.set_xlabel('Year')
     
-#     count_scatter_1 = 0
-#     count_scatter_2 = 3
-#     for category in categories:
-#         # filter the data correctly
-#         if category == 'C1a_NZGHGs':
-#             data = df_results[df_results['Category_subset']==category]
-#         elif category == 'C1' or 'C2':
-#             data = df_results.loc[df_results['Category']==category]
+    count_scatter_1 = 0
+    count_scatter_2 = 3
+    for category in categories:
+        # filter the data correctly
+        if category == 'C1a_NZGHGs':
+            data = df_results[df_results['Category_subset']==category]
+        elif category == 'C1' or 'C2':
+            data = df_results.loc[df_results['Category']==category]
     
-#         ax1.scatter(data['Net zero CO2 year_harmonised'], [count_scatter_1-0.1]*len(data), color='black', alpha=0.4, s=.75)
-#         ax1.scatter(data['Net zero GHG year_harmonised'], [count_scatter_2-0.1]*len(data), color='black', alpha=0.4, s=.75)
+        ax1.scatter(data['Net zero CO2 year_harmonised'], [count_scatter_1-0.1]*len(data), color='black', alpha=0.4, s=.75)
+        ax1.scatter(data['Net zero GHG year_harmonised'], [count_scatter_2-0.1]*len(data), color='black', alpha=0.4, s=.75)
 
-#         # plot each of the datapoints with an alpha based on their weighting
-#         median_weight = df_results['Weight'].median()
-#         for i, row in data.iterrows():
-#             # if row['Weight'] < median_weight:
-#             #     alpha_weight = row['NorliWeight'] + 0.01
-#             # else:
-#             #     alpha_weight = 0.4 + row['Normalised Weight']
-#             alpha_weight = row['Normalised Weight']   
-#             ax1.scatter(row['Net zero CO2 year_harmonised'], count_scatter_1+0.1, color='black', alpha=alpha_weight, s=.75)
-#             ax1.scatter(row['Net zero GHG year_harmonised'], count_scatter_2+0.1, color='black', alpha=alpha_weight, s=.75)
+        # plot each of the datapoints with an alpha based on their weighting
+        median_weight = df_results['Weight'].median()
+        for i, row in data.iterrows():
 
-#         delta = 0.2
-#         # add 5th and 95th percentile lines in gray at the point on the y axis, .2 either side of count
-#         lower_5th = data['Net zero CO2 year_harmonised'].quantile(0.05)
-#         upper_95th = data['Net zero CO2 year_harmonised'].quantile(0.95)
-#         lower_5th_weighted = wquantiles.quantile(data['Net zero CO2 year_harmonised'], data['Weight'], 0.05)
-#         upper_95th_weighted = wquantiles.quantile(data['Net zero CO2 year_harmonised'], data['Weight'], 0.95)
-#         upper_5th_ghgs = data['Net zero GHG year_harmonised'].quantile(0.05)
-#         lower_95th_ghgs = data['Net zero GHG year_harmonised'].quantile(0.95)
-#         upper_5th_ghgs_weighted = wquantiles.quantile(data['Net zero GHG year_harmonised'], data['Weight'], 0.05)
-#         lower_95th_ghgs_weighted = wquantiles.quantile(data['Net zero GHG year_harmonised'], data['Weight'], 0.95)
-#         ax1.vlines(lower_5th, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=0.75)
-#         ax1.vlines(upper_95th, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=0.75)
-#         ax1.vlines(upper_5th_ghgs, count_scatter_2 - delta, count_scatter_2, colors='gray', linestyles='--', linewidth=0.75)
-#         ax1.vlines(lower_95th_ghgs, count_scatter_2 - delta, count_scatter_2, colors='gray', linestyles='--', linewidth=0.75)
-#         ax1.vlines(lower_5th_weighted, count_scatter_1, count_scatter_1 + delta, colors='gray', linestyles='--', linewidth=0.75)
-#         ax1.vlines(upper_95th_weighted, count_scatter_1, count_scatter_1 + delta, colors='gray', linestyles='--', linewidth=0.75)
-#         ax1.vlines(upper_5th_ghgs_weighted, count_scatter_2, count_scatter_2 + delta, colors='gray', linestyles='--', linewidth=0.75)
-#         ax1.vlines(lower_95th_ghgs_weighted, count_scatter_2, count_scatter_2 + delta, colors='gray', linestyles='--', linewidth=0.75)
-#         count_scatter_1 += 1
-#         count_scatter_2 += 1
+            alpha_weight = row['Normalised Weight']
+            ax1.scatter(row['Net zero CO2 year_harmonised'], count_scatter_1+0.1, color='black', alpha=alpha_weight, s=.75)
+            ax1.scatter(row['Net zero GHG year_harmonised'], count_scatter_2+0.1, color='black', alpha=alpha_weight, s=.75)
+
+        delta = 0.2
+        # add 5th and 95th percentile lines in gray at the point on the y axis, .2 either side of count
+        lower_5th = data['Net zero CO2 year_harmonised'].quantile(0.05)
+        upper_95th = data['Net zero CO2 year_harmonised'].quantile(0.95)
+        lower_5th_weighted = wquantiles.quantile(data['Net zero CO2 year_harmonised'], data['Weight'], 0.05)
+        upper_95th_weighted = wquantiles.quantile(data['Net zero CO2 year_harmonised'], data['Weight'], 0.95)
+        upper_5th_ghgs = data['Net zero GHG year_harmonised'].quantile(0.05)
+        lower_95th_ghgs = data['Net zero GHG year_harmonised'].quantile(0.95)
+        upper_5th_ghgs_weighted = wquantiles.quantile(data['Net zero GHG year_harmonised'], data['Weight'], 0.05)
+        lower_95th_ghgs_weighted = wquantiles.quantile(data['Net zero GHG year_harmonised'], data['Weight'], 0.95)
+        ax1.vlines(lower_5th, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=1)
+        ax1.vlines(upper_95th, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=1)
+        ax1.vlines(upper_5th_ghgs, count_scatter_2 - delta, count_scatter_2, colors='gray', linestyles='--', linewidth=1)
+        ax1.vlines(lower_95th_ghgs, count_scatter_2 - delta, count_scatter_2, colors='gray', linestyles='--', linewidth=1)
+        ax1.vlines(lower_5th_weighted, count_scatter_1, count_scatter_1 + delta, colors='gray', linestyles='--', linewidth=1)
+        ax1.vlines(upper_95th_weighted, count_scatter_1, count_scatter_1 + delta, colors='gray', linestyles='--', linewidth=1)
+        ax1.vlines(upper_5th_ghgs_weighted, count_scatter_2, count_scatter_2 + delta, colors='gray', linestyles='--', linewidth=1)
+        ax1.vlines(lower_95th_ghgs_weighted, count_scatter_2, count_scatter_2 + delta, colors='gray', linestyles='--', linewidth=1)
+        count_scatter_1 += 1
+        count_scatter_2 += 1
     
-#     # add text in top left for 'CO2'
-#     ax1.text(2031, -0.25, 'CO2', fontsize=7)
-#     ax1.text(2031, 2.75, 'GHGs', fontsize=7)
+    # add text in top left for 'CO2'
+    ax1.text(2031, -0.25, 'CO2', fontsize=7)
+    ax1.text(2031, 2.75, 'GHGs', fontsize=7)
 
-#     # edit the legend
-#     handles, labels = ax1.get_legend_handles_labels()
-#     ax1.legend(handles=handles, labels=['Unweighted', 'Weighted'], loc='best', frameon=False)
-#     # remove y axis label
-#     ax1.set_ylabel('')
-#     ax1.set_xlim(2030, 2100)
+    # edit the legend
+    handles, labels = ax1.get_legend_handles_labels()
+    ax1.legend(handles=handles, labels=['Unweighted', 'Weighted'], loc='best', frameon=False)
+    # remove y axis label
+    ax1.set_ylabel('')
+    ax1.set_xlim(2030, 2100)
     
-#     ax2.set_title('GHG emissions reductions 2020 to 2035 & 2050')
-#     ax2.tick_params(axis='x', which='minor', length=0)
-#     ax3.tick_params(axis='x', which='minor', length=0)
-#     ax4.tick_params(axis='x', which='minor', length=0)
-#     # ax5.tick_params(axis='x', which='minor', length=0)
-#     to_plot_ax2 = pd.DataFrame()
+    ax2.set_title('GHG emissions reductions 2020 to 2035 & 2050')
+    ax2.tick_params(axis='x', which='minor', length=0)
+    ax3.tick_params(axis='x', which='minor', length=0)
+    ax4.tick_params(axis='x', which='minor', length=0)
+    # ax5.tick_params(axis='x', which='minor', length=0)
+    to_plot_ax2 = pd.DataFrame()
     
     
-#     """
-#     loop through and add 2030, 35, and 40, 2020 to reductions of GHGs and append
-#     with corresponding 
+    """
+    loop through and add 2030, 35, and 40, 2020 to reductions of GHGs and append
+    with corresponding 
 
-#     """
-#     # first get 2020 - 2035 and 2050 reductions
-#     # df_results = Utils.add_emissions_reductions(df_results, Data.harmonised_emissions_data, 2020, 
-#     #                                       'GHGs', [2035, 2050])
+    """
+    # first get 2020 - 2035 and 2050 reductions
+    # df_results = Utils.add_emissions_reductions(df_results, Data.harmonised_emissions_data, 2020, 
+    #                                       'GHGs', [2035, 2050])
 
-#     count_2035 = 0
-#     count_2050 = 3
+    count_2035 = 0
+    count_2050 = 3
 
-#     # now set up the plot for the next variable 
-#     for category in categories:
-#         if category == 'C1a_NZGHGs':
-#             data = df_results[df_results['Category_subset']==category]
-#         elif category == 'C1' or 'C2':
-#             data = df_results.loc[df_results['Category']==category]
+    # now set up the plot for the next variable 
+    for category in categories:
+        if category == 'C1a_NZGHGs':
+            data = df_results[df_results['Category_subset']==category]
+        elif category == 'C1' or 'C2':
+            data = df_results.loc[df_results['Category']==category]
         
-#         weighted_distribution_2035 = weighted_quantiles = [wquantiles.quantile(data['Emissions Reductions_GHGs_2035'], data['Weight'], q) for q in np.linspace(0, 1, len(data))]
-#         unweighted_distribution_2035 = data['Emissions Reductions_GHGs_2035'].values
-#         weighted_distribution_2050 = weighted_quantiles = [wquantiles.quantile(data['Emissions Reductions_GHGs_2050'], data['Weight'], q) for q in np.linspace(0, 1, len(data))]
-#         unweighted_distribution_2050 = data['Emissions Reductions_GHGs_2050'].values
+        weighted_distribution_2035 = weighted_quantiles = [wquantiles.quantile(data['Emissions Reductions_GHGs_2035'], data['Weight'], q) for q in np.linspace(0, 1, len(data))]
+        unweighted_distribution_2035 = data['Emissions Reductions_GHGs_2035'].values
+        weighted_distribution_2050 = weighted_quantiles = [wquantiles.quantile(data['Emissions Reductions_GHGs_2050'], data['Weight'], q) for q in np.linspace(0, 1, len(data))]
+        unweighted_distribution_2050 = data['Emissions Reductions_GHGs_2050'].values
 
-#         unweighted_distribution_2035 = pd.DataFrame(unweighted_distribution_2035, columns=['Emissions Reductions_GHGs_2035'])
-#         unweighted_distribution_2035['Weighted'] = 0
-#         unweighted_distribution_2050 = pd.DataFrame(unweighted_distribution_2050, columns=['Emissions Reductions_GHGs_2035'])
-#         unweighted_distribution_2050['Weighted'] = 0
+        unweighted_distribution_2035 = pd.DataFrame(unweighted_distribution_2035, columns=['Emissions Reductions_GHGs_2035'])
+        unweighted_distribution_2035['Weighted'] = 0
+        unweighted_distribution_2050 = pd.DataFrame(unweighted_distribution_2050, columns=['Emissions Reductions_GHGs_2035'])
+        unweighted_distribution_2050['Weighted'] = 0
 
-#         weighted_distribution_2035 = pd.DataFrame(weighted_distribution_2035, columns=['Emissions Reductions_GHGs_2035'])
-#         weighted_distribution_2035['Weighted'] = 1
-#         weighted_distribution_2050 = pd.DataFrame(weighted_distribution_2050, columns=['Emissions Reductions_GHGs_2035'])
-#         weighted_distribution_2050['Weighted'] = 1
+        weighted_distribution_2035 = pd.DataFrame(weighted_distribution_2035, columns=['Emissions Reductions_GHGs_2035'])
+        weighted_distribution_2035['Weighted'] = 1
+        weighted_distribution_2050 = pd.DataFrame(weighted_distribution_2050, columns=['Emissions Reductions_GHGs_2035'])
+        weighted_distribution_2050['Weighted'] = 1
 
-#         # add x position for 2035
-#         unweighted_distribution_2035['x_value'] = count_2035
-#         weighted_distribution_2035['x_value'] = count_2035
+        # add x position for 2035
+        unweighted_distribution_2035['x_value'] = count_2035
+        weighted_distribution_2035['x_value'] = count_2035
 
-#         # add x position for 2050
-#         unweighted_distribution_2050['x_value'] = count_2050
-#         weighted_distribution_2050['x_value'] = count_2050
+        # add x position for 2050
+        unweighted_distribution_2050['x_value'] = count_2050
+        weighted_distribution_2050['x_value'] = count_2050
 
-#         plotting_df = pd.DataFrame()
-#         plotting_df = pd.concat([unweighted_distribution_2035, weighted_distribution_2035, unweighted_distribution_2050, weighted_distribution_2050], ignore_index=True, axis=0)
-#         to_plot_ax2 = pd.concat([to_plot_ax2, plotting_df], axis=0)
-#         count_2035 += 1
-#         count_2050 += 1
+        plotting_df = pd.DataFrame()
+        plotting_df = pd.concat([unweighted_distribution_2035, weighted_distribution_2035, unweighted_distribution_2050, weighted_distribution_2050], ignore_index=True, axis=0)
+        to_plot_ax2 = pd.concat([to_plot_ax2, plotting_df], axis=0)
+        count_2035 += 1
+        count_2050 += 1
 
-#     ax2.minorticks_on()
-#     ax2.tick_params(axis='y', which='minor')
-#     print(to_plot_ax2)  
-#     sns.violinplot(data=to_plot_ax2, x='x_value', y='Emissions Reductions_GHGs_2035',
-#             hue='Weighted', ax=ax2, split=True, linewidth=0.75, fill=True, linecolor='lightgray',
-#             inner='quart', cut=0, palette=Plotting.category_colours_shades,
-#             gap=.02, legend=False)
-#     print(to_plot_ax2)
-#     #print the x positions
-#     print(ax2.get_xticks())
+    ax2.minorticks_on()
+    ax2.tick_params(axis='y', which='minor')
+    print(to_plot_ax2)  
+    sns.violinplot(data=to_plot_ax2, x='x_value', y='Emissions Reductions_GHGs_2035',
+            hue='Weighted', ax=ax2, split=True, linewidth=0.75, fill=True, linecolor='lightgray',
+            inner='quart', cut=0, palette=CATEGORY_COLOURS_SHADES,
+            gap=.02, legend=False)
+    print(to_plot_ax2)
+    #print the x positions
+    print(ax2.get_xticks())
 
-#     # add in the scatter points
-#     count_scatter_1 = 0
+    # add in the scatter points
+    count_scatter_1 = 0
 
-#     for category in categories:
+    for category in categories:
 
-#         # filter the data correctly
-#         if category == 'C1a_NZGHGs':
-#             data = df_results[df_results['Category_subset']==category]
-#         elif category == 'C1' or 'C2':
-#             data = df_results.loc[df_results['Category']==category]
-#         ax2.scatter([count_scatter_1-0.1]*len(data), data['Emissions Reductions_GHGs_2035'], color='black', alpha=0.4, s=.75)
-#         ax2.scatter([count_scatter_1+3-0.1]*len(data), data['Emissions Reductions_GHGs_2050'], color='black', alpha=0.4, s=.75)
+        # filter the data correctly
+        if category == 'C1a_NZGHGs':
+            data = df_results[df_results['Category_subset']==category]
+        elif category == 'C1' or 'C2':
+            data = df_results.loc[df_results['Category']==category]
+        ax2.scatter([count_scatter_1-0.1]*len(data), data['Emissions Reductions_GHGs_2035'], color='black', alpha=0.4, s=.75)
+        ax2.scatter([count_scatter_1+3-0.1]*len(data), data['Emissions Reductions_GHGs_2050'], color='black', alpha=0.4, s=.75)
 
-#         # plot each of the datapoints with an alpha based on their weighting
-#         median_weight = df_results['Weight'].median()
-#         for i, row in data.iterrows():
-#             # if row['Weight'] < median_weight:
-#             #     alpha_weight = row['Normalised Weight'] + 0.01
-#             # else:
-#             #     alpha_weight = 0.4 + row['Normalised Weight']
-#             alpha_weight = row['Normalised Weight']   
-#             ax2.scatter(count_scatter_1+0.1, row['Emissions Reductions_GHGs_2035'], color='black', alpha=alpha_weight, s=.75)
-#             ax2.scatter(count_scatter_1+3+0.1, row['Emissions Reductions_GHGs_2050'], color='black', alpha=alpha_weight, s=.75)
+        # plot each of the datapoints with an alpha based on their weighting
+        median_weight = df_results['Weight'].median()
+        for i, row in data.iterrows():
+            # if row['Weight'] < median_weight:
+            #     alpha_weight = row['Normalised Weight'] + 0.01
+            # else:
+            #     alpha_weight = 0.4 + row['Normalised Weight']
+            alpha_weight = row['Normalised Weight']   
+            ax2.scatter(count_scatter_1+0.1, row['Emissions Reductions_GHGs_2035'], color='black', alpha=alpha_weight, s=.75)
+            ax2.scatter(count_scatter_1+3+0.1, row['Emissions Reductions_GHGs_2050'], color='black', alpha=alpha_weight, s=.75)
         
-#         lower_5th_2035 = data['Emissions Reductions_GHGs_2035'].quantile(0.05)
-#         upper_95th_2035 = data['Emissions Reductions_GHGs_2035'].quantile(0.95)
-#         lower_5th_weighted_2035 = wquantiles.quantile(data['Emissions Reductions_GHGs_2035'], data['Weight'], 0.05)
-#         upper_95th_weighted_2035 = wquantiles.quantile(data['Emissions Reductions_GHGs_2035'], data['Weight'], 0.95)
-#         ax2.hlines(lower_5th_2035, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=0.75)
-#         ax2.hlines(upper_95th_2035, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=0.75)
-#         ax2.hlines(lower_5th_weighted_2035, count_scatter_1, count_scatter_1 + delta, colors='gray', linestyles='--', linewidth=0.75)
-#         ax2.hlines(upper_95th_weighted_2035, count_scatter_1, count_scatter_1 + delta, colors='gray', linestyles='--', linewidth=0.75)
-#         lower_5th_2050 = data['Emissions Reductions_GHGs_2050'].quantile(0.05)
-#         upper_95th_2050 = data['Emissions Reductions_GHGs_2050'].quantile(0.95)
-#         lower_5th_weighted_2050 = wquantiles.quantile(data['Emissions Reductions_GHGs_2050'], data['Weight'], 0.05)
-#         upper_95th_weighted_2050 = wquantiles.quantile(data['Emissions Reductions_GHGs_2050'], data['Weight'], 0.95)
-#         ax2.hlines(lower_5th_2050, count_scatter_1 + 3 - delta, count_scatter_1 + 3, colors='gray', linestyles='--', linewidth=0.75)
-#         ax2.hlines(upper_95th_2050, count_scatter_1 + 3 - delta, count_scatter_1 + 3, colors='gray', linestyles='--', linewidth=0.75)
-#         ax2.hlines(lower_5th_weighted_2050, count_scatter_1 + 3, count_scatter_1 + 3 + delta, colors='gray', linestyles='--', linewidth=0.75)
-#         ax2.hlines(upper_95th_weighted_2050, count_scatter_1 + 3, count_scatter_1 + 3 + delta, colors='gray', linestyles='--', linewidth=0.75)
+        lower_5th_2035 = data['Emissions Reductions_GHGs_2035'].quantile(0.05)
+        upper_95th_2035 = data['Emissions Reductions_GHGs_2035'].quantile(0.95)
+        lower_5th_weighted_2035 = wquantiles.quantile(data['Emissions Reductions_GHGs_2035'], data['Weight'], 0.05)
+        upper_95th_weighted_2035 = wquantiles.quantile(data['Emissions Reductions_GHGs_2035'], data['Weight'], 0.95)
+        ax2.hlines(lower_5th_2035, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=1)
+        ax2.hlines(upper_95th_2035, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=1)
+        ax2.hlines(lower_5th_weighted_2035, count_scatter_1, count_scatter_1 + delta, colors='gray', linestyles='--', linewidth=1)
+        ax2.hlines(upper_95th_weighted_2035, count_scatter_1, count_scatter_1 + delta, colors='gray', linestyles='--', linewidth=1)
+        lower_5th_2050 = data['Emissions Reductions_GHGs_2050'].quantile(0.05)
+        upper_95th_2050 = data['Emissions Reductions_GHGs_2050'].quantile(0.95)
+        lower_5th_weighted_2050 = wquantiles.quantile(data['Emissions Reductions_GHGs_2050'], data['Weight'], 0.05)
+        upper_95th_weighted_2050 = wquantiles.quantile(data['Emissions Reductions_GHGs_2050'], data['Weight'], 0.95)
+        ax2.hlines(lower_5th_2050, count_scatter_1 + 3 - delta, count_scatter_1 + 3, colors='gray', linestyles='--', linewidth=1)
+        ax2.hlines(upper_95th_2050, count_scatter_1 + 3 - delta, count_scatter_1 + 3, colors='gray', linestyles='--', linewidth=1)
+        ax2.hlines(lower_5th_weighted_2050, count_scatter_1 + 3, count_scatter_1 + 3 + delta, colors='gray', linestyles='--', linewidth=1)
+        ax2.hlines(upper_95th_weighted_2050, count_scatter_1 + 3, count_scatter_1 + 3 + delta, colors='gray', linestyles='--', linewidth=1)
 
     
-#         count_scatter_1 += 1
+        count_scatter_1 += 1
     
 
-#     # set y axis label
-#     ax2.set_ylabel('GHG Emissions Reductions (%)')
-#     ax2.set_xlabel('')
-#     ax1.set_xlabel('')
+    # set y axis label
+    ax2.set_ylabel('GHG Emissions Reductions (%)')
+    ax2.set_xlabel('')
+    ax1.set_xlabel('')
 
-#     # add verticle line at 2.5
-#     ax2.axvline(2.5, color='black', linestyle='--', linewidth=0.5, alpha=0.5)
-#     # add text in top left for 'CO2'
-#     ax2.text(-0.35, 105, '2035', fontsize=7)
-#     ax2.text(2.55, 105, '2050', fontsize=7)
-#     # set xtick labels to be the categories
-#     plt.setp(ax2, xticks=[0, 1, 2, 3, 4, 5], xticklabels=['C1', 'C1a', 'C2', 'C1', 'C1a', 'C2'])
+    # add verticle line at 2.5
+    ax2.axvline(2.5, color='black', linestyle='--', linewidth=0.5, alpha=0.5)
+    # add text in top left for 'CO2'
+    ax2.text(-0.35, 105, '2035', fontsize=7)
+    ax2.text(2.55, 105, '2050', fontsize=7)
+    # set xtick labels to be the categories
+    plt.setp(ax2, xticks=[0, 1, 2, 3, 4, 5], xticklabels=['C1', 'C1a', 'C2', 'C1', 'C1a', 'C2'])
 
-#     # set up the plot for the next variable
-#     to_plot_ax3 = pd.DataFrame()
-#     for category in categories:
-#         if category == 'C1a_NZGHGs':
-#             data = df_results[df_results['Category_subset']==category]
-#         elif category == 'C1' or 'C2':
-#             data = df_results.loc[df_results['Category']==category]
-#         weighted_distribution = weighted_quantiles = [wquantiles.quantile(data['Primary_Oil_Gas_2030'], data['Weight'], q) for q in np.linspace(0, 1, len(data))]
-#         unweighted_distribution = data['Primary_Oil_Gas_2030'].values
-#         unweighted_distribution = pd.DataFrame(unweighted_distribution, columns=['Primary_Oil_Gas_2030'])
-#         unweighted_distribution['Weighted'] = 0
-#         weighted_distribution = pd.DataFrame(weighted_distribution, columns=['Primary_Oil_Gas_2030'])
-#         weighted_distribution['Weighted'] = 1
-#         plotting_df = pd.DataFrame()
-#         plotting_df = pd.concat([unweighted_distribution, weighted_distribution], ignore_index=True, axis=0)
-#         plotting_df['Category'] = category
-#         to_plot_ax3 = pd.concat([to_plot_ax3, plotting_df], axis=0)
-#         # count_new += 1
+    # set up the plot for the next variable
+    to_plot_ax3 = pd.DataFrame()
+    for category in categories:
+        if category == 'C1a_NZGHGs':
+            data = df_results[df_results['Category_subset']==category]
+        elif category == 'C1' or 'C2':
+            data = df_results.loc[df_results['Category']==category]
+        weighted_distribution = weighted_quantiles = [wquantiles.quantile(data['Primary_Oil_Gas_2030'], data['Weight'], q) for q in np.linspace(0, 1, len(data))]
+        unweighted_distribution = data['Primary_Oil_Gas_2030'].values
+        unweighted_distribution = pd.DataFrame(unweighted_distribution, columns=['Primary_Oil_Gas_2030'])
+        unweighted_distribution['Weighted'] = 0
+        weighted_distribution = pd.DataFrame(weighted_distribution, columns=['Primary_Oil_Gas_2030'])
+        weighted_distribution['Weighted'] = 1
+        plotting_df = pd.DataFrame()
+        plotting_df = pd.concat([unweighted_distribution, weighted_distribution], ignore_index=True, axis=0)
+        plotting_df['Category'] = category
+        to_plot_ax3 = pd.concat([to_plot_ax3, plotting_df], axis=0)
+        # count_new += 1
     
-#     # remove nan values from variable column
-#     to_plot_ax3 = to_plot_ax3.dropna(subset=['Primary_Oil_Gas_2030'])
-#     print(to_plot_ax3)
+    # remove nan values from variable column
+    to_plot_ax3 = to_plot_ax3.dropna(subset=['Primary_Oil_Gas_2030'])
+    print(to_plot_ax3)
 
-#     sns.violinplot(data=to_plot_ax3, x='Category', y='Primary_Oil_Gas_2030',
-#             hue='Weighted', ax=ax3, split=True, linewidth=0.75, fill=True, linecolor='lightgray',
-#             inner='quart', cut=0, palette=Plotting.category_colours_shades,
-#             gap=.02, legend=False)
+    sns.violinplot(data=to_plot_ax3, x='Category', y='Primary_Oil_Gas_2030',
+            hue='Weighted', ax=ax3, split=True, linewidth=0.75, fill=True, linecolor='lightgray',
+            inner='quart', cut=0, palette=CATEGORY_COLOURS_SHADES,
+            gap=.02, legend=False)
     
-#     # add in the scatter points
-#     count_scatter_1 = 0
-#     for category in categories:
+    # add in the scatter points
+    count_scatter_1 = 0
+    for category in categories:
             
-#             # filter the data correctly
-#             if category == 'C1a_NZGHGs':
-#                 data = df_results[df_results['Category_subset']==category]
-#             elif category == 'C1' or 'C2':
-#                 data = df_results.loc[df_results['Category']==category]
+            # filter the data correctly
+            if category == 'C1a_NZGHGs':
+                data = df_results[df_results['Category_subset']==category]
+            elif category == 'C1' or 'C2':
+                data = df_results.loc[df_results['Category']==category]
             
-#             data = data.dropna(subset=['Primary_Oil_Gas_2030'])
-#             ax3.scatter([count_scatter_1-0.1]*len(data), data['Primary_Oil_Gas_2030'], color='black', alpha=0.4, s=.75)
+            data = data.dropna(subset=['Primary_Oil_Gas_2030'])
+            ax3.scatter([count_scatter_1-0.1]*len(data), data['Primary_Oil_Gas_2030'], color='black', alpha=0.4, s=.75)
     
-#             # plot each of the datapoints with an alpha based on their weighting
-#             median_weight = df_results['Weight'].median()
-#             for i, row in data.iterrows():
-#                 # if row['Weight'] < median_weight:
-#                 #     alpha_weight = row['Normalised Weight'] + 0.01
-#                 # else:
-#                 #     alpha_weight = 0.4 + row['Normalised Weight']
-#                 alpha_weight = row['Normalised Weight']   
-#                 ax3.scatter(count_scatter_1+0.1, row['Primary_Oil_Gas_2030'], color='black', alpha=alpha_weight, s=.75)
+            # plot each of the datapoints with an alpha based on their weighting
+            median_weight = df_results['Weight'].median()
+            for i, row in data.iterrows():
+                # if row['Weight'] < median_weight:
+                #     alpha_weight = row['Normalised Weight'] + 0.01
+                # else:
+                #     alpha_weight = 0.4 + row['Normalised Weight']
+                alpha_weight = row['Normalised Weight']   
+                ax3.scatter(count_scatter_1+0.1, row['Primary_Oil_Gas_2030'], color='black', alpha=alpha_weight, s=.75)
             
-#             lower_5th = data['Primary_Oil_Gas_2030'].quantile(0.05)
-#             upper_95th = data['Primary_Oil_Gas_2030'].quantile(0.95)
-#             lower_5th_weighted = wquantiles.quantile(data['Primary_Oil_Gas_2030'], data['Weight'], 0.05)
-#             upper_95th_weighted = wquantiles.quantile(data['Primary_Oil_Gas_2030'], data['Weight'], 0.95)
-#             ax3.hlines(lower_5th, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=0.5)
-#             ax3.hlines(upper_95th, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=0.5)
-#             ax3.hlines(lower_5th_weighted, count_scatter_1, count_scatter_1 + delta, colors='gray', linestyles='--', linewidth=0.5)
-#             ax3.hlines(upper_95th_weighted, count_scatter_1, count_scatter_1 + delta, colors='gray', linestyles='--', linewidth=0.5)
-#             count_scatter_1 += 1
+            lower_5th = data['Primary_Oil_Gas_2030'].quantile(0.05)
+            upper_95th = data['Primary_Oil_Gas_2030'].quantile(0.95)
+            lower_5th_weighted = wquantiles.quantile(data['Primary_Oil_Gas_2030'], data['Weight'], 0.05)
+            upper_95th_weighted = wquantiles.quantile(data['Primary_Oil_Gas_2030'], data['Weight'], 0.95)
+            ax3.hlines(lower_5th, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=1)
+            ax3.hlines(upper_95th, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=1)
+            ax3.hlines(lower_5th_weighted, count_scatter_1, count_scatter_1 + delta, colors='gray', linestyles='--', linewidth=1)
+            ax3.hlines(upper_95th_weighted, count_scatter_1, count_scatter_1 + delta, colors='gray', linestyles='--', linewidth=1)
+            count_scatter_1 += 1
 
-#     # set y axis label
-#     ax3.set_ylabel('Primary Energy Oil and Gas (EJ)')
-#     ax3.set_xlabel('')
-#     ax3.set_title('Primary Energy from Oil and Gas in 2030')
-#     ax3.minorticks_on()
-#     ax3.tick_params(axis='y', which='minor')
-#     ax3.set_ylim(100, 450)
+    # set y axis label
+    ax3.set_ylabel('Primary Energy Oil and Gas (EJ)')
+    ax3.set_xlabel('')
+    ax3.set_title('Primary Energy from Oil and Gas in 2030')
+    ax3.minorticks_on()
+    ax3.tick_params(axis='y', which='minor')
+    ax3.set_ylim(100, 450)
 
-#     # set up the plot for the next variable,  Growth_rate_Final Energy
-#     to_plot_ax4 = pd.DataFrame()
-#     for category in categories:
-#         if category == 'C1a_NZGHGs':
-#             data = df_results[df_results['Category_subset']==category]
-#         elif category == 'C1' or 'C2':
-#             data = df_results.loc[df_results['Category']==category]
-#         weighted_distribution = weighted_quantiles = [wquantiles.quantile(data['Growth_rate_Final Energy'], data['Weight'], q) for q in np.linspace(0, 1, len(data))]
-#         unweighted_distribution = data['Growth_rate_Final Energy'].values
-#         unweighted_distribution = pd.DataFrame(unweighted_distribution, columns=['Growth_rate_Final Energy'])
-#         unweighted_distribution['Weighted'] = 0
-#         weighted_distribution = pd.DataFrame(weighted_distribution, columns=['Growth_rate_Final Energy'])
-#         weighted_distribution['Weighted'] = 1
-#         plotting_df = pd.DataFrame()
-#         plotting_df = pd.concat([unweighted_distribution, weighted_distribution], ignore_index=True, axis=0)
-#         plotting_df['Category'] = category
-#         to_plot_ax4 = pd.concat([to_plot_ax4, plotting_df], axis=0)
-#         # count_new += 1
+    # set up the plot for the next variable,  Growth_rate_Final Energy
+    to_plot_ax4 = pd.DataFrame()
+    for category in categories:
+        if category == 'C1a_NZGHGs':
+            data = df_results[df_results['Category_subset']==category]
+        elif category == 'C1' or 'C2':
+            data = df_results.loc[df_results['Category']==category]
+        weighted_distribution = weighted_quantiles = [wquantiles.quantile(data['Growth_rate_Final Energy'], data['Weight'], q) for q in np.linspace(0, 1, len(data))]
+        unweighted_distribution = data['Growth_rate_Final Energy'].values
+        unweighted_distribution = pd.DataFrame(unweighted_distribution, columns=['Growth_rate_Final Energy'])
+        unweighted_distribution['Weighted'] = 0
+        weighted_distribution = pd.DataFrame(weighted_distribution, columns=['Growth_rate_Final Energy'])
+        weighted_distribution['Weighted'] = 1
+        plotting_df = pd.DataFrame()
+        plotting_df = pd.concat([unweighted_distribution, weighted_distribution], ignore_index=True, axis=0)
+        plotting_df['Category'] = category
+        to_plot_ax4 = pd.concat([to_plot_ax4, plotting_df], axis=0)
+        # count_new += 1
     
-#     # remove nan values from variable column
-#     to_plot_ax4 = to_plot_ax4.dropna(subset=['Growth_rate_Final Energy'])
-#     print(to_plot_ax4)
+    # remove nan values from variable column
+    to_plot_ax4 = to_plot_ax4.dropna(subset=['Growth_rate_Final Energy'])
+    print(to_plot_ax4)
 
-#     sns.violinplot(data=to_plot_ax4, x='Category', y='Growth_rate_Final Energy',
-#             hue='Weighted', ax=ax4, split=True, linewidth=0.75, fill=True, linecolor='lightgray',
-#             inner='quart', cut=0, palette=Plotting.category_colours_shades,
-#             gap=.02, legend=False)
+    sns.violinplot(data=to_plot_ax4, x='Category', y='Growth_rate_Final Energy',
+            hue='Weighted', ax=ax4, split=True, linewidth=0.75, fill=True, linecolor='lightgray',
+            inner='quart', cut=0, palette=CATEGORY_COLOURS_SHADES,
+            gap=.02, legend=False)
     
-#     # add in the scatter points
-#     count_scatter_1 = 0
-#     for category in categories:
+    # add in the scatter points
+    count_scatter_1 = 0
+    for category in categories:
 
-#         # filter the data correctly
-#         if category == 'C1a_NZGHGs':
-#             data = df_results[df_results['Category_subset']==category]
-#         elif category == 'C1' or 'C2':
-#             data = df_results.loc[df_results['Category']==category]
+        # filter the data correctly
+        if category == 'C1a_NZGHGs':
+            data = df_results[df_results['Category_subset']==category]
+        elif category == 'C1' or 'C2':
+            data = df_results.loc[df_results['Category']==category]
         
-#         data = data.dropna(subset=['Growth_rate_Final Energy'])
-#         ax4.scatter([count_scatter_1-0.1]*len(data), data['Growth_rate_Final Energy'], color='black', alpha=0.4, s=.75)
+        data = data.dropna(subset=['Growth_rate_Final Energy'])
+        ax4.scatter([count_scatter_1-0.1]*len(data), data['Growth_rate_Final Energy'], color='black', alpha=0.4, s=.75)
 
-#         # plot each of the datapoints with an alpha based on their weighting
-#         median_weight = df_results['Weight'].median()
-#         for i, row in data.iterrows():
-#             # if row['Weight'] < median_weight:
-#             #     alpha_weight = row['Normalised Weight'] + 0.01
-#             # else:
-#             #     alpha_weight = 0.4 + row['Normalised Weight']
-#             alpha_weight = row['Normalised Weight']   
-#             ax4.scatter(count_scatter_1+0.1, row['Growth_rate_Final Energy'], color='black', alpha=alpha_weight, s=.75)
+        # plot each of the datapoints with an alpha based on their weighting
+        median_weight = df_results['Weight'].median()
+        for i, row in data.iterrows():
+            # if row['Weight'] < median_weight:
+            #     alpha_weight = row['Normalised Weight'] + 0.01
+            # else:
+            #     alpha_weight = 0.4 + row['Normalised Weight']
+            alpha_weight = row['Normalised Weight']   
+            ax4.scatter(count_scatter_1+0.1, row['Growth_rate_Final Energy'], color='black', alpha=alpha_weight, s=.75)
         
-#         lower_5th = data['Growth_rate_Final Energy'].quantile(0.05)
-#         upper_95th = data['Growth_rate_Final Energy'].quantile(0.95)
-#         lower_5th_weighted = wquantiles.quantile(data['Growth_rate_Final Energy'], data['Weight'], 0.05)
-#         upper_95th_weighted = wquantiles.quantile(data['Growth_rate_Final Energy'], data['Weight'], 0.95)
-#         ax4.hlines(lower_5th, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=0.75)
-#         ax4.hlines(upper_95th, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=0.5)
-#         ax4.hlines(lower_5th_weighted, count_scatter_1, count_scatter_1 + delta, colors='gray', linestyles='--', linewidth=0.75)
-#         ax4.hlines(upper_95th_weighted, count_scatter_1, count_scatter_1 +  delta, colors='gray', linestyles='--', linewidth=0.75)
-#         count_scatter_1 += 1
+        lower_5th = data['Growth_rate_Final Energy'].quantile(0.05)
+        upper_95th = data['Growth_rate_Final Energy'].quantile(0.95)
+        lower_5th_weighted = wquantiles.quantile(data['Growth_rate_Final Energy'], data['Weight'], 0.05)
+        upper_95th_weighted = wquantiles.quantile(data['Growth_rate_Final Energy'], data['Weight'], 0.95)
+        ax4.hlines(lower_5th, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=1)
+        ax4.hlines(upper_95th, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=1)
+        ax4.hlines(lower_5th_weighted, count_scatter_1, count_scatter_1 + delta, colors='gray', linestyles='--', linewidth=1)
+        ax4.hlines(upper_95th_weighted, count_scatter_1, count_scatter_1 +  delta, colors='gray', linestyles='--', linewidth=1)
+        count_scatter_1 += 1
 
-#     # set y axis label
-#     ax4.set_ylabel('Compound Growth Rate in Final Energy (%/year, 2020-2100')
-#     ax4.set_xlabel('')
-#     ax4.set_title('Energy Demand Growth Rate ')
-#     ax4.minorticks_on()
-#     ax4.tick_params(axis='y', which='minor')
-#     # ax4.set_ylim(-10, 10)
+    # set y axis label
+    ax4.set_ylabel('Compound Growth Rate in Final Energy (%/year, 2020-2100')
+    ax4.set_xlabel('')
+    ax4.set_title('Energy Demand Growth Rate ')
+    ax4.minorticks_on()
+    ax4.tick_params(axis='y', which='minor')
+    # ax4.set_ylim(-10, 10)
 
 
-#     plt.tight_layout()
-#     plt.savefig('figures')
-#     plt.show()
+    plt.tight_layout()
+    # plt.savefig('figures')
+    plt.show()
 
 
 # # Function that plots weighted and unweighted histograms of variable data

@@ -166,6 +166,163 @@ VARIABLE_INFO = {
     }
 }
 
+VARIABLE_INFO_ENERGY = {
+    'Emissions|CH4': {
+        'group': 'Emissions',
+        'group_weight': 0,
+        'subgroup_weight': 1/6
+    },
+    'Emissions|CO2': {
+        'group': 'Emissions',
+        'group_weight': 0,
+        'subgroup_weight': 1/2
+    },
+    'Emissions|N2O': {
+        'group': 'Emissions',
+        'group_weight': 0,
+        'subgroup_weight': 1/6
+    },
+    'Emissions|Sulfur': {
+        'group': 'Emissions',
+        'group_weight': 0,
+        'subgroup_weight': 1/6
+    },
+    'Primary Energy|Biomass': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Coal': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Gas': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Non-Biomass Renewables': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Nuclear': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Oil': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 1/12
+    },
+    'Final Energy': {
+        'group': 'Energy',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/2
+    },
+    'Consumption': {
+        'group': 'Economy',
+        'group_weight': 0,
+        'subgroup_weight': 1/2
+    },
+    'GDP|PPP': {
+        'group': 'Economy',
+        'group_weight': 0,
+        'subgroup_weight': 1/2
+    },
+    'Carbon Sequestration|CCS': {
+        'group': 'Mitigation',
+        'group_weight': 0,
+        'subgroup_weight': 1/2
+    },
+    'Price|Carbon': {
+        'group': 'Mitigation',
+        'group_weight': 0,
+        'subgroup_weight': 1/2
+    }
+}
+
+
+
+VARIABLE_INFO_NO_EMISSIONS = {
+    'Emissions|CH4': {
+        'group': 'Emissions',
+        'group_weight': 0,
+        'subgroup_weight': 1/6
+    },
+    'Emissions|CO2': {
+        'group': 'Emissions',
+        'group_weight': 0,
+        'subgroup_weight': 1/2
+    },
+    'Emissions|N2O': {
+        'group': 'Emissions',
+        'group_weight': 0,
+        'subgroup_weight': 1/6
+    },
+    'Emissions|Sulfur': {
+        'group': 'Emissions',
+        'group_weight': 0,
+        'subgroup_weight': 1/6
+    },
+    'Primary Energy|Biomass': {
+        'group': 'Energy',
+        'group_weight': 1/3,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Coal': {
+        'group': 'Energy',
+        'group_weight': 1/3,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Gas': {
+        'group': 'Energy',
+        'group_weight': 1/3,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Non-Biomass Renewables': {
+        'group': 'Energy',
+        'group_weight': 1/3,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Nuclear': {
+        'group': 'Energy',
+        'group_weight': 1/3,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Oil': {
+        'group': 'Energy',
+        'group_weight': 1/3,
+        'subgroup_weight': 1/12
+    },
+    'Final Energy': {
+        'group': 'Energy',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/2
+    },
+    'Consumption': {
+        'group': 'Economy',
+        'group_weight': 1/3,
+        'subgroup_weight': 1/2
+    },
+    'GDP|PPP': {
+        'group': 'Economy',
+        'group_weight': 1/3,
+        'subgroup_weight': 1/2
+    },
+    'Carbon Sequestration|CCS': {
+        'group': 'Mitigation',
+        'group_weight': 1/3,
+        'subgroup_weight': 1/2
+    },
+    'Price|Carbon': {
+        'group': 'Mitigation',
+        'group_weight': 1/3,
+        'subgroup_weight': 1/2
+    }
+}
 
 CORREL_ADJUSTED_WEIGHTS_FLAT = {'Carbon Sequestration|CCS': 0.06350000662461833, 
                            'Consumption': 0.09892179218802338, 
@@ -216,6 +373,7 @@ ASSESSMENT_VARIABLES = ['Net zero GHG year_harmonised',
 # Plotting constants
 CATEGORY_COLOURS = ['#97CAEA', '#3070AD',  '#DC267F', '#C0C0C0', '#909090']
 CATEGORY_COLOURS_SHADES = ['#648FFF', '#4660b2', '#FFB000', '#b27e00', '#DC267F', '#981754']
+CATEGORY_COLOURS_SHADES_DICT = {'C1':['#648FFF', '#4660b2'], 'C1a_NZGHGs':['#97CAEA', '#6EA3C4'], 'C2':['#DC267F', '#981754']}
 MODES_COLOURS = {'Model_family': '#FFB000',
                  'Project': '#009E73', 
                  'Tech_diffusion': '#785EF0'}
