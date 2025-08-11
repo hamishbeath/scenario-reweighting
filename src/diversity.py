@@ -446,7 +446,7 @@ def calculate_composite_weight(weighting_data_file, original_scenario_data, outp
 
     # output to a CSV file
     output_df.to_csv(OUTPUT_DIR + f'composite_weights_{output_id}.csv', index=False)
-
+    return output_df
 
 # function that provides a new set of weights for the scenarios that are missing variables
 def adjust_weights_for_missing_variables(missing_variables, variable_info):
@@ -657,7 +657,7 @@ def get_variable_correlation_matrix(variable_data, variables, output_id):
     return scenario_corrs
 
 
-
+# function that does correlation analysis based on decadal snapshots
 def get_snapshot_variable_correlation(variable_data, variables, output_id):
     """
     Calculates variable correlation matrices based on snapshots in time (e.g. decadal values).
@@ -717,8 +717,6 @@ def get_snapshot_variable_correlation(variable_data, variables, output_id):
     yearly_corrs_df.to_csv(os.path.join(OUTPUT_DIR, f'variable_correlation_matrix_{output_id}_SNAPSHOT_YEARLY.csv'))
     return mean_corr, yearly_corrs
 
-
-
 # Function to compute weights while preserving group structure
 def compute_weights_preserve_group(corr_matrix, variable_info):
     group_vars = {}
@@ -754,7 +752,6 @@ def compute_weights_preserve_group(corr_matrix, variable_info):
     total = sum(final_weights.values())
     final_weights = {k: v / total for k, v in final_weights.items()}
     return final_weights
-
 
 
 def compute_weights_flat(corr_matrix):

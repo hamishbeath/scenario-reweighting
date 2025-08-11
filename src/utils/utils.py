@@ -1,7 +1,8 @@
 
 import pyam
+import pandas as pd
 from constants import *
-# import ixmp4
+import ixmp4
 
 
 """
@@ -9,7 +10,7 @@ This is a set of utils that are used by different scripts in the framework analy
 """
 
 def data_download(variables, models, scenarios, region, categories, database,
-                    end_year, file_name=str):
+                    end_year, file_name='output'):
 
     if database == 'ar6':
         # Connect to the AR6 database
@@ -97,3 +98,58 @@ def model_family(input_df, model_family):
     input_df['Model_family'] = model_family_list  
     input_df.reset_index(inplace=True)
     return input_df
+
+
+
+# Util function that returns cumulative values of a given variable for scenarios in a dataframe
+def get_cumulative_values_pandas(df, meta_cols, start_year=2020, end_year=2100):
+    
+    """
+    Returns cumulative values of a given variable for scenarios in a dataframe.
+    Function works on the basis of input pandas dataframe with long format.
+    
+    
+    Parameters:
+        df (pd.DataFrame): DataFrame containing the data, filtered for variable
+        variable (str): The variable to calculate cumulative values for.
+        meta_cols (list): List of meta columns to consider for grouping.
+        start_year (int): The first year of data to consider for cumulative calculation.
+        end_year (int): The last year of data to consider for cumulative calculation.
+    
+    Returns:
+        pd.DataFrame: DataFrame with cumulative values added as variable + cumulative.
+    
+    """
+
+    # Get the years from start_year to end_year
+    years = [year for year in range(start_year, end_year + 1)]
+    df = df[df['Year'].isin(years)]
+    
+    # Define the columns that identify a unique time series
+    group_cols = ['Model', 'Scenario', 'Variable', 'Region', 'Unit'] + meta_cols
+
+    # Group by the identifying columns and interpolate within each group
+    def interpolate_group(group):
+
+        group_indexed = group.set_index('Year')
+        full_years = pd.Index(years, name='Year')
+        group_reindexed = group_indexed.reindex(full_years)
+        # Interpolate the Value column
+        group_reindexed['Value'] = group_reindexed['Value'].interpolate(method='linear')
+
+        group_reindexed = group_reindexed.ffill()
+        return group_reindexed.reset_index()
+    
+    # Apply interpolation to each group
+    df_interpolated = df.groupby(group_cols, group_keys=False).apply(interpolate_group)
+    
+    # Calculate cumulative values for each group
+    df_interpolated['cumulative_value'] = df_interpolated.groupby(group_cols)['Value'].cumsum()
+
+    df_final = df_interpolated.loc[df_interpolated['Year'] == end_year].copy()
+
+    df_final['Value'] = df_final['cumulative_value']
+    df_final = df_final.drop('cumulative_value', axis=1)
+    
+    df_final = df_final.reset_index(drop=True)
+    return df_final

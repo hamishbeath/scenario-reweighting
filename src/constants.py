@@ -342,6 +342,24 @@ CORREL_ADJUSTED_WEIGHTS_FLAT = {'Carbon Sequestration|CCS': 0.06350000662461833,
 }
 
 
+# CORREL_ADJUSTED_WEIGHTS_FLAT = {'Carbon Sequestration|CCS': 0, 
+#                            'Consumption': 0, 
+#                            'Emissions|CH4': 0, 
+#                            'Emissions|CO2': 0, 
+#                            'Emissions|N2O': 0, 
+#                            'Emissions|Sulfur': 0, 
+#                            'Final Energy': 0, 
+#                            'GDP|PPP': 0, 
+#                            'Price|Carbon': 0, 
+#                            'Primary Energy|Biomass': 0, 
+#                            'Primary Energy|Coal': 0, 
+#                            'Primary Energy|Gas': 0, 
+#                            'Primary Energy|Non-Biomass Renewables': 0, 
+#                            'Primary Energy|Nuclear': 1, 
+#                            'Primary Energy|Oil': 0
+# }
+
+
 # SSP Scenarios
 SSP_SCENARIOS = ssp_scenarios = [
     'SSP1-19', 'SSP1-26', 'SSP1-34', 'SSP1-45', 'SSP1-Baseline',
@@ -360,15 +378,16 @@ QUANTILE_LEVELS = [0.05, 0.25, 0.5, 0.75, 0.95]  # Quantile levels for sigma cal
 ASSESSMENT_VARIABLES = ['Net zero GHG year_harmonised', 
                 'Primary_Oil_Gas_2030',
                 'Net zero CO2 year_harmonised', 
-                'Growth_rate_Final Energy'] 
-                # 'Primary_Oil_Gas_2050',
-                # 'GHG emissions reductions 2019-2030 % modelled Harmonized-Infilled', 
-                # 'GHG emissions reductions 2019-2040 % modelled Harmonized-Infilled',
-                # 'Final_Energy_2030', 'Final_Energy_2050',
-                # 'Oil_Gas_Share_2030',
-                # 'Oil_Gas_Share_2050',
-                # 'Emissions Reductions_GHGs_2035',
-                # 'Emissions Reductions_GHGs_2050']
+                'Growth_rate_Final Energy', 
+                'Primary_Oil_Gas_2050',
+                'GHG emissions reductions 2019-2030 % modelled Harmonized-Infilled', 
+                'GHG emissions reductions 2019-2040 % modelled Harmonized-Infilled',
+                'Final_Energy_2030', 'Final_Energy_2050',
+                'Oil_Gas_Share_2030',
+                'Oil_Gas_Share_2050',
+                'Emissions Reductions_GHGs_2035',
+                'Emissions Reductions_GHGs_2050','Median peak warming (MAGICCv7.5.3)',
+                 'Median warming in 2100 (MAGICCv7.5.3)']
 
 # Plotting constants
 CATEGORY_COLOURS = ['#97CAEA', '#3070AD',  '#DC267F', '#C0C0C0', '#909090']

@@ -3,6 +3,7 @@ from .utils import (
     data_download_sub,
     add_meta_cols,
     model_family,
+    get_cumulative_values_pandas,
 )
 
 from .file_parser import (
@@ -20,5 +21,6 @@ __all__ = [
     'save_dataframe_csv'
     'read_csv',
     'add_meta_cols',
-    'model_family'
+    'model_family',
+    'get_cumulative_values_pandas'
 ]
