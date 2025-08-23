@@ -53,9 +53,9 @@ def data_download_sub(variables, models, scenarios, categories, region, end_year
         
         platform = ixmp4.Platform("scenariocompass-dev")
         
-        # if Carbon Sequestration|CCS in variables, replace with Carbon Capture
-        if 'Carbon Sequestration|CCS' in variables:
-            variables = [var.replace('Carbon Sequestration|CCS', 'Carbon Capture') for var in variables]
+        # # if Carbon Sequestration|CCS in variables, replace with Carbon Capture
+        # if 'Carbon Sequestration|CCS' in variables:
+        #     variables = [var.replace('Carbon Sequestration|CCS', 'Carbon Capture') for var in variables]
         
         df = pyam.read_ixmp4(
                             platform,
@@ -86,16 +86,20 @@ def add_meta_cols(input_df, meta, metacols=list()):
 
 
 # sub function that adds the model family to the results dataframe
-def model_family(input_df, model_family):
+def model_family(input_df, model_family, Model_type=False):
 
     model_family.set_index('Model', inplace=True)
     input_df.set_index(['Model','Scenario'], inplace=True)
     # add a column to df results that has the corresponding model family for each scenario entry
     model_family_list = []
+    model_type_list = []
     for model in input_df.index.get_level_values('Model'):
         model_family_list.append(model_family.loc[model, 'Model_family'])
-    
-    input_df['Model_family'] = model_family_list  
+        if Model_type:
+            model_type_list.append(model_family.loc[model, 'Model_type'])
+    input_df['Model_family'] = model_family_list
+    if Model_type:
+        input_df['Model_type'] = model_type_list
     input_df.reset_index(inplace=True)
     return input_df
 

@@ -1,6 +1,6 @@
 
 import numpy as np
-from constants import VETTING_VARS, VETTING_CRITERIA, OUTPUT_DIR, CATEGORIES_ALL
+from constants import VETTING_VARS, VETTING_CRITERIA, OUTPUT_DIR, CATEGORIES_ALL, INPUT_DIR
 import pandas as pd
 import pyam
 from utils import data_download_sub, read_csv
@@ -28,16 +28,16 @@ def main():
     Calculate the continuous quality weighting for the vetting criteria.
 
     """
+    meta_data = read_csv(INPUT_DIR + 'ar6_meta_data.csv')
     quality_weighting_data = read_csv(OUTPUT_DIR + 'quality_weighting_data.csv')
-    quality_weights = calculate_quality_weighting(quality_weighting_data, plot_scatter=False)
+    quality_weights = calculate_quality_weighting(quality_weighting_data, meta_data, plot_scatter=False,
+    interpolate=True)
     quality_weights.to_csv(OUTPUT_DIR + 'quality_weights_ar6.csv')
 
-    # for variable in VETTING_VARIABLES:
-    #     print(variable)
 
+def calculate_quality_weighting(scenario_data, meta_data, vetting_criteria=VETTING_CRITERIA, plot_scatter=False,
+                                 interpolate=False):
 
-def calculate_quality_weighting(scenario_data, vetting_criteria=VETTING_CRITERIA, plot_scatter=False):
-    
     """
     Calculate the quality weighting for the scenario data based on the vetting criteria.
     
@@ -50,46 +50,55 @@ def calculate_quality_weighting(scenario_data, vetting_criteria=VETTING_CRITERIA
     category listed. 
     
     """
-    # Placeholder for actual implementation
-    # This function should calculate the quality weighting based on the vetting criteria
 
     # drop region and unit columns if they exist
-    if 'region' in scenario_data.columns:
-        scenario_data = scenario_data.drop(columns=['region'])
-    if 'unit' in scenario_data.columns:
-        scenario_data = scenario_data.drop(columns=['unit'])
+    if 'Region' in scenario_data.columns:
+        scenario_data = scenario_data.drop(columns=['Region'])
+    if 'Unit' in scenario_data.columns:
+        scenario_data = scenario_data.drop(columns=['Unit'])
 
     output_df = pd.DataFrame(columns=['Scenario', 'Model'])
     output_df = output_df.set_index(['Scenario', 'Model'])
     
+    if interpolate:
+        # Implement interpolation logic here
+        scenario_data = interpolate_quality_vars(scenario_data)
+        scenario_data = scenario_data.reset_index()
+        print(scenario_data)
+
     for criteria, vars in vetting_criteria.items():
         print(f"Criteria: {criteria}, Variables: {vars}")
 
         variables  = vars['Variables']
         value = vars['Value']
-        range = vars['Range']
+        range_value = vars['Range']
 
         criteria_data = scenario_data.copy()
         criteria_data = criteria_data[criteria_data['Variable'].isin(variables)]
 
         grouped_data = criteria_data.groupby(['Scenario', 'Model'])
 
+        if interpolate:
+            target_year = vars['Year']
+        else:
+            target_year = str(2020)
+
         # sum the criteria vetting variables for each scenario and model
-        criteria_sums = grouped_data['2020'].sum().reset_index()
+        criteria_sums = grouped_data[target_year].sum().reset_index()
 
         # calculate the distance from the value for each scenario and model
-        criteria_sums['quality_distance'] = (criteria_sums['2020'] - value).abs()
+        criteria_sums['quality_distance'] = (criteria_sums[target_year] - value).abs()
 
         # assess pass or fail based on the range
-        criteria_sums['pass'] = criteria_sums['quality_distance'] <= (value * range)
+        criteria_sums['pass'] = criteria_sums['quality_distance'] <= (value * range_value)
 
         print('The number of scenarios that fail the criteria is: ',
               criteria_sums[criteria_sums['pass'] == False].shape[0])
 
         # export the failed scenarios to a csv file
-        criteria_sums[criteria_sums['pass'] == False].to_csv(OUTPUT_DIR + f'failed_{criteria}_scenarios.csv')
-       
-
+        criteria_fail_output = criteria_sums[criteria_sums['pass'] == False]
+        criteria_fail_output = criteria_fail_output.join(meta_data.set_index(['Scenario', 'Model']), on=['Scenario', 'Model'])
+        criteria_fail_output.to_csv(OUTPUT_DIR + f'failed_{criteria}_scenarios.csv')
 
         criteria_sums_passed = criteria_sums[criteria_sums['pass'] == True]   
 
@@ -98,7 +107,7 @@ def calculate_quality_weighting(scenario_data, vetting_criteria=VETTING_CRITERIA
         criteria_sums_passed['scaled_d'] = criteria_sums_passed['quality_distance'] / iqr
 
         criteria_sums_passed[criteria + '_quality_weighting'] = np.exp(-criteria_sums_passed['scaled_d']**2)
-        criteria_sums_passed = criteria_sums_passed.drop(columns=['pass', 'scaled_d', '2020'])
+        criteria_sums_passed = criteria_sums_passed.drop(columns=['pass', 'scaled_d', target_year])
 
 
         if plot_scatter == True:
@@ -136,6 +145,45 @@ def calculate_quality_weighting(scenario_data, vetting_criteria=VETTING_CRITERIA
     return output_df
 
 
+# Interpolate years 
+def interpolate_quality_vars(scenario_data):
+
+    interpolated_df = scenario_data.copy()
+
+    # Get the years from start_year to end_year
+    years = [year for year in range(2010, 2025)]
+
+    # Define the columns that identify a unique time series
+    group_cols = ['Model', 'Scenario', 'Variable']
+
+    # melt to long format
+    df_melted = pd.melt(interpolated_df, id_vars=group_cols, var_name='Year', value_name='Value')
+
+    # years as ints
+    df_melted['Year'] = df_melted['Year'].astype(int)
+
+    # Filter the melted dataframe to only include the years of interest
+    df_melted = df_melted[df_melted['Year'].isin(years)]
+
+    # Group by the identifying columns and interpolate within each group
+    def interpolate_group(group):
+
+        group_indexed = group.set_index('Year')
+        full_years = pd.Index(years, name='Year')
+        group_reindexed = group_indexed.reindex(full_years)
+        # Interpolate the Value column
+        group_reindexed['Value'] = group_reindexed['Value'].interpolate(method='linear')
+
+        group_reindexed = group_reindexed.ffill()
+        return group_reindexed.reset_index()
+    
+    # Apply interpolation to each group
+    df_interpolated = df_melted.groupby(group_cols, group_keys=False).apply(interpolate_group)
+    
+    # convert back to wide format using pivot
+    df_interpolated = df_interpolated.pivot(index=group_cols, columns='Year', values='Value')
+    print(df_interpolated)
+    return df_interpolated
 
 
 if __name__ == "__main__":

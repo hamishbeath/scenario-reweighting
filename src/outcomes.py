@@ -14,8 +14,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from utils import read_csv, add_meta_cols, get_cumulative_values_pandas
 from diversity import calculate_composite_weight
-from constants import OUTPUT_DIR, INPUT_DIR, VARIABLE_INFO_ENERGY, VARIABLE_INFO
-from constants import VARIABLE_INFO_NO_EMISSIONS, CATEGORIES_15, CORREL_ADJUSTED_WEIGHTS_FLAT, ASSESSMENT_VARIABLES
+from constants import *
 
 def main():
     
@@ -25,14 +24,14 @@ def main():
     # Define the parameters for the analysis
     sigma_values = ['0.00', '0.25', '0.50', '0.70', '1.00']
     variable_weight_approaches = [
-        'expert', 'energy', 'no_emissions', 'flat'
-    ]
+        'expert', 'flat']
+
     variables_with_meta = read_csv(INPUT_DIR + 'ar6_data_with_plotting_meta.csv')
     ar6_meta = read_csv(INPUT_DIR + 'ar6_meta_data.csv')
 
-    # add additional metadata columns
-    variables_with_meta = add_meta_cols(variables_with_meta, ar6_meta, 
-                                        metacols=['Median peak warming (MAGICCv7.5.3)', 'Median warming in 2100 (MAGICCv7.5.3)'])
+    # # add additional metadata columns
+    # variables_with_meta = add_meta_cols(variables_with_meta, ar6_meta, 
+    #                                     metacols=['Median peak warming (MAGICCv7.5.3)', 'Median warming in 2100 (MAGICCv7.5.3)'])
 
     ar6_meta.reset_index(inplace=True)
     variables_with_meta_indicators = ['Net zero CO2 year_harmonised', 'Net zero GHG year_harmonised',
@@ -46,23 +45,38 @@ def main():
 
     # build_analysis_table_sensitivities(sigma_values, variable_weight_approaches, 
     #                                    variables_with_meta, variables_with_meta_indicators, tier_0_data,
-    #                                    cumulative_vars, [['C1']], output_id='C1_flat', meta_data=ar6_meta)
+    #                                    cumulative_vars, [['C2']], output_id='hc_C2', meta_data=ar6_meta)
+
 
     sigma = '0.70'
-    approach = 'expert'
-
+    approach = 'flat'
+    database = 'ar6'
     weights_input = read_csv(OUTPUT_DIR + f'composite_weights_ar6_{sigma}_sigma_{approach}_weights.csv')
-    
-    # add the weights columns
-    variables_with_meta = variables_with_meta.merge(weights_input,
-                                                   on=['Model', 'Scenario'],
-                                                   how='left')
+    quality_weights = read_csv(OUTPUT_DIR + 'quality_weights_ar6.csv')
 
+    combined_weights(quality_weights, weights_input, database, sigma, approach)
+
+
+    # # add the weights columns
+    # variables_with_meta = variables_with_meta.merge(weights_input,
+    #                                                on=['Model', 'Scenario'],
+    # #                                                how='left')
     # print(variables_with_meta.head())
-    output_id = f'ar6_{approach}_{sigma}'
-    jackknife_analysis(CATEGORIES_15, ['Model_family', 'Project'], ASSESSMENT_VARIABLES, variables_with_meta, output_id=output_id)
+    # output_id = f'ar6_{approach}_{sigma}'
+    # jackknife_analysis(CATEGORIES_15, ['Model_family', 'Project'], ASSESSMENT_VARIABLES, variables_with_meta, output_id=output_id)
 
 
+
+def combined_weights(quality_weights, diversity_weights, database, sigma, weighting_approach):
+
+
+    combined_df = quality_weights.merge(diversity_weights, on=['Model', 'Scenario'], suffixes=('_quality', '_diversity'))
+    combined_df['Weight'] = combined_df['Weight_quality'] / (1 / combined_df['Weight_diversity'])
+    combined_df = combined_df[['Model', 'Scenario', 'Weight']]
+
+    # normalise the weights to be a distribution
+    combined_df['Weight'] = combined_df['Weight'] / combined_df['Weight'].sum()
+    combined_df.to_csv(OUTPUT_DIR + f'combined_weights_{database}_{sigma}_sigma_{weighting_approach}_weights.csv', index=False)
 
 
 # Function to build analysis table for sensitivities
@@ -168,13 +182,9 @@ def build_analysis_table_sensitivities(sigma_values, variable_weight_approaches,
                     weighting_vars = {'expert': VARIABLE_INFO,
                                       'energy': VARIABLE_INFO_ENERGY,
                                       'no_emissions': VARIABLE_INFO_NO_EMISSIONS,
-                                      'flat': VARIABLE_INFO}
-                    if approach == 'flat':
-                        flat = CORREL_ADJUSTED_WEIGHTS_FLAT
-                    else:
-                        flat = None
+                                      'flat': CORREL_ADJUSTED_WEIGHTS_FLAT_HC}
                     scenario_composite_weights = calculate_composite_weight(scenario_variable_weights, tier_0_data,
-                                               f'ar6_{sigma}_sigma_{approach}_weights', weighting_vars[approach], flat_weights=flat)
+                                               f'ar6_{sigma}_sigma_{approach}_weights', weighting_vars[approach], flat_weights=None)
 
                 # print(scenario_composite_weights.head())
                 
@@ -255,11 +265,11 @@ def build_analysis_table_sensitivities(sigma_values, variable_weight_approaches,
     prct_df.to_csv(OUTPUT_DIR + 'analysis_table_sensitivities_' + output_id + '.csv', index=False)
 
 
-    # make beautiful heatmaps of the analysis table
-    prct_df = prct_df.set_index(['Category', 'Variable Weights', 'Sigma'])
-    plt.figure(figsize=(12, 8))
-    sns.heatmap(prct_df, annot=True, fmt=".2f", cmap='coolwarm')
-    plt.show()
+    # # make heatmaps of the analysis table
+    # prct_df = prct_df.set_index(['Category', 'Variable Weights', 'Sigma'])
+    # plt.figure(figsize=(12, 8))
+    # sns.heatmap(prct_df, annot=True, fmt=".2f", cmap='coolwarm')
+    # plt.show()
 
 
 

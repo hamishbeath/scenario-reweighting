@@ -45,6 +45,22 @@ TIER_0_VARIABLES = ['Emissions|CO2',
                     'GDP|PPP',
                     'Price|Carbon']
 
+TIER_0_VARIABLES_SCI = ['Emissions|CO2',
+                    'Emissions|N2O',
+                    'Final Energy',
+                    'Emissions|Sulfur',
+                    'Consumption',
+                    'Emissions|CH4',
+                    'Primary Energy|Gas',
+                    'Primary Energy|Oil',
+                    'Primary Energy|Nuclear',
+                    'Primary Energy|Coal',
+                    'Primary Energy|Non-Biomass Renewables',
+                    'Primary Energy|Biomass',
+                    'GDP|PPP',
+                    'Price|Carbon']
+
+
 VARIABLE_GROUPS = {
     'Emissions|CH4': 'Emissions', 
     'Emissions|CO2': 'Emissions',
@@ -165,6 +181,81 @@ VARIABLE_INFO = {
         'subgroup_weight': 1/2
     }
 }
+
+VARIABLE_INFO_SCI = {
+    'Emissions|CH4': {
+        'group': 'Emissions',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/6
+    },
+    'Emissions|CO2': {
+        'group': 'Emissions',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/2
+    },
+    'Emissions|N2O': {
+        'group': 'Emissions',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/6
+    },
+    'Emissions|Sulfur': {
+        'group': 'Emissions',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/6
+    },
+    'Primary Energy|Biomass': {
+        'group': 'Energy',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Coal': {
+        'group': 'Energy',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Gas': {
+        'group': 'Energy',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Non-Biomass Renewables': {
+        'group': 'Energy',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Nuclear': {
+        'group': 'Energy',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Oil': {
+        'group': 'Energy',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/12
+    },
+    'Final Energy': {
+        'group': 'Energy',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/2
+    },
+    'Consumption': {
+        'group': 'Economy',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/2
+    },
+    'GDP|PPP': {
+        'group': 'Economy',
+        'group_weight': 1/4,
+        'subgroup_weight': 1/2
+    },
+    'Price|Carbon': {
+        'group': 'Mitigation',
+        'group_weight': 1/4,
+        'subgroup_weight': 1
+    }
+}
+
+
 
 VARIABLE_INFO_ENERGY = {
     'Emissions|CH4': {
@@ -341,6 +432,167 @@ CORREL_ADJUSTED_WEIGHTS_FLAT = {'Carbon Sequestration|CCS': 0.06350000662461833,
                            'Primary Energy|Oil': 0.049695307108789395
 }
 
+# CORREL_ADJUSTED_WEIGHTS_FLAT_HC = {'Carbon Sequestration|CCS': 0.125, 
+#                            'Consumption': 0.125, 
+#                            'Emissions|CH4': 0, 
+#                            'Emissions|CO2': 0.125, 
+#                            'Emissions|N2O': 0.125, 
+#                            'Emissions|Sulfur': 0, 
+#                            'Final Energy': 0, 
+#                            'GDP|PPP': 0.125, 
+#                            'Price|Carbon': 0.125, 
+#                            'Primary Energy|Biomass': 0.0, 
+#                            'Primary Energy|Coal': 0.0, 
+#                            'Primary Energy|Gas': 0.0, 
+#                            'Primary Energy|Non-Biomass Renewables': 0.125, 
+#                            'Primary Energy|Nuclear': 0.125, 
+#                            'Primary Energy|Oil': 0.125
+
+SIGMAS_SCI = ['0.0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0']
+SIGMAS_AR6 = ['0.00', '0.10', '0.20', '0.30', '0.40', '0.50', '0.60', '0.70', '0.80', '0.90', '1.00']
+
+MODES_COLOURMAPS = {
+    'Project_study': {
+        'CD-LINKS': '#e6194b', 'COMMIT': '#3cb44b', 'ENGAGE': '#ffe119',
+        'Fujimori 2020': '#4363d8', 'Holz 2018': '#f58231', 'SSP': '#911eb4',
+        'Ou 2021': '#46f0f0', 'van Vuuren 2021': '#f032e6', 'ADVANCE': '#bcf60c', 'EMF30': '#ff7f0e',
+        'EMF33': '#fabebe', 'Grubler 2018': '#008080', 'NGFS2': '#e6beff',
+        'Kikstra 2021': '#9a6324', 'Strefler 2018': '#fffac8', 'Strefler 2021a': '#800000',
+        'Schultes 2021': '#aaffc3', 'Baumstark 2021': '#808000', 'Kriegler 2018': '#ffd8b1',
+        'Bertram 2018': '#000075', 'Strefler 2021b': '#808080', 'Soergel 2021': '#ffffff',
+        'Luderer 2021': '#000000', 'Other': "#7f7f7f", 'Guo 2021': '#c0c0c0'
+    },
+    'Model_type': {
+        'IT_GE': '#d2f53c', 'IT_PE': '#fabea4', 'RD_CGE': '#6a3d9a',
+        'RD_PE': "#469990", 'SD': '#e8a3fd'
+    },
+    'Model_family':{
+                    'AIM': '#1f77b4',
+                    'C-ROADS': '#ff7f0e',
+                    'COFFEE': '#2ca02c',
+                    'EPPA': '#d62728',
+                    'GCAM': '#9467bd',
+                    'GEM-E3': '#8c564b',
+                    'IMACLIM': '#e377c2',
+                    'IMAGE': "#7f7f7f",
+                    'MERGE': '#bcbd22',
+                    'MESSAGE': "#17becf",
+                    'PROMETHEUS': '#aec7e8',
+                    'POLES': '#ffbb78',
+                    'REMIND': '#98df8a',
+                    'TIAM': '#ff9896',
+                    'WITCH': '#c5b0d5',
+                    'Other': '#c49c94'
+                    },
+    
+    'Policy_category': {
+        "P0": "#f7b6d2",
+        "P0_1a": "#dbdb8d",
+        "P0_1d": "#9edae5",
+        "P0_2": "#393b79",
+        "P0_3a": "#5254a3",
+        "P0_3b": "#6b6ecf",
+        "P1": "#9c9ede",
+        "P1a": "#637939",
+        "P1b": "#8ca252",
+        "P1c": "#b5cf6b",
+        "P1d": "#cedb9c",
+        "P2": "#8c6d31",
+        "P2a": "#bd9e39",
+        "P2b": "#e7ba52",
+        "P2c": "#e7cb94",
+        "P3a": "#843c39",
+        "P3b": "#ad494a",
+        "P3c": "#d6616b",
+        "P4": "#e7969c"
+    },
+    'Ssp_family': {
+        1.0: "#7b4173",
+        2.0: "#a55194",
+        3.0: "#ce6dbd",
+        4.0: "#de9ed6",
+        5.0: "#3182bd"
+    }
+}
+
+
+CORREL_ADJUSTED_WEIGHTS_FLAT_HC = {
+    'Emissions|CH4': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Emissions|CO2': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Emissions|N2O': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Emissions|Sulfur': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Primary Energy|Biomass': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Primary Energy|Coal': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Primary Energy|Gas': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Primary Energy|Non-Biomass Renewables': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Primary Energy|Nuclear': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Primary Energy|Oil': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Final Energy': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Consumption': {
+        'group': 'Economy',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'GDP|PPP': {
+        'group': 'Economy',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Carbon Sequestration|CCS': {
+        'group': 'Mitigation',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Price|Carbon': {
+        'group': 'Mitigation',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    }
+}
 
 # CORREL_ADJUSTED_WEIGHTS_FLAT = {'Carbon Sequestration|CCS': 0, 
 #                            'Consumption': 0, 
@@ -374,20 +626,35 @@ DATABASES = ['ar6', 'sci']  # Available databases
 
 QUANTILE_LEVELS = [0.05, 0.25, 0.5, 0.75, 0.95]  # Quantile levels for sigma calculations
 
+# # Assessment constants
+# ASSESSMENT_VARIABLES = ['Net zero GHG year_harmonised', 
+#                 'Primary_Oil_Gas_2030',
+#                 'Net zero CO2 year_harmonised', 
+#                 'Growth_rate_Final Energy', 
+#                 'Primary_Oil_Gas_2050',
+#                 'GHG emissions reductions 2019-2030 % modelled Harmonized-Infilled', 
+#                 'GHG emissions reductions 2019-2040 % modelled Harmonized-Infilled',
+#                 'Final_Energy_2030', 'Final_Energy_2050',
+#                 'Oil_Gas_Share_2030',
+#                 'Oil_Gas_Share_2050',
+#                 'Emissions Reductions_GHGs_2035',
+#                 'Emissions Reductions_GHGs_2050','Median peak warming (MAGICCv7.5.3)',
+#                  'Median warming in 2100 (MAGICCv7.5.3)']
+
 # Assessment constants
 ASSESSMENT_VARIABLES = ['Net zero GHG year_harmonised', 
                 'Primary_Oil_Gas_2030',
                 'Net zero CO2 year_harmonised', 
-                'Growth_rate_Final Energy', 
-                'Primary_Oil_Gas_2050',
-                'GHG emissions reductions 2019-2030 % modelled Harmonized-Infilled', 
-                'GHG emissions reductions 2019-2040 % modelled Harmonized-Infilled',
-                'Final_Energy_2030', 'Final_Energy_2050',
-                'Oil_Gas_Share_2030',
-                'Oil_Gas_Share_2050',
-                'Emissions Reductions_GHGs_2035',
-                'Emissions Reductions_GHGs_2050','Median peak warming (MAGICCv7.5.3)',
-                 'Median warming in 2100 (MAGICCv7.5.3)']
+                'Growth_rate_Final Energy']
+                # 'Primary_Oil_Gas_2050',
+                # 'GHG emissions reductions 2019-2030 % modelled Harmonized-Infilled', 
+                # 'GHG emissions reductions 2019-2040 % modelled Harmonized-Infilled',
+                # 'Final_Energy_2030', 'Final_Energy_2050',
+                # 'Oil_Gas_Share_2030',
+                # 'Oil_Gas_Share_2050',
+                # 'Emissions Reductions_GHGs_2035',
+                # 'Emissions Reductions_GHGs_2050','Median peak warming (MAGICCv7.5.3)',
+                #  'Median warming in 2100 (MAGICCv7.5.3)']
 
 # Plotting constants
 CATEGORY_COLOURS = ['#97CAEA', '#3070AD',  '#DC267F', '#C0C0C0', '#909090']
@@ -432,7 +699,8 @@ CB_COLOUR_MAP = [
     "#661100",  # Dark Brown
 ]
 
-CB_CAT_COLORS = {'C1':'#332288', 
+CB_CAT_COLORS = {'C1':'#332288',
+                 'C1b':'#604CC7',
                 'C2':'#117733', 
                 'C3':'#44AA99', 
                 'C4':'#88CCEE', 
@@ -461,24 +729,30 @@ RELEVANCE_THRESHOLDS = {
 # Quality Weighting Constants
 VETTING_CRITERIA = {'CO2 Total':{'Variables':['Emissions|CO2'],
                                 'Value': 44251, # in MtCO2
-                                'Range': 0.40}, # +/- % #
+                                'Range': 0.40,
+                                'Year': 2019}, # +/- % #
                     'CO2 EIP emissions':{'Variables':['Emissions|CO2|Energy and Industrial Processes'],
                                 'Value': 37646, # in MtCO2
-                                'Range': 0.20}, # +/- % #
+                                'Range': 0.20,
+                                'Year': 2019}, # +/- % #
                     'CH4 emissions':{'Variables':['Emissions|CH4'],
-                                'Value': 379, # in MtCH4
-                                'Range': 0.20}, # +/- % #
+                                'Value': 379.2168, # in MtCH4
+                                'Range': 0.20,
+                                'Year': 2019}, # +/- % #
                     'Primary Energy': {'Variables':['Primary Energy'],
                                 'Value': 578, # in EJ
-                                'Range': 0.20}, # +/- % #
+                                'Range': 0.20,
+                                'Year':2018}, # +/- % #
                     'Nuclear electricity': {'Variables':['Secondary Energy|Electricity|Nuclear'],
                                 'Value': 9.77, # in %
-                                'Range': 0.30}, # +/- % #
+                                'Range': 0.30,
+                                'Year': 2018}, # +/- % #
                     'Solar and wind': {'Variables':['Secondary Energy|Wind', 'Secondary Energy|Solar'],
                                 'Value': 8.51, # in %
-                                'Range': 0.50}} # +/- % #
+                                'Range': 0.50,
+                                'Year': 2018}} # +/- % #
 
-VETTING_VARS = ['Emissions|CO2', 'Emissions|CH4', 'Primary Energy',
+VETTING_VARS = ['Emissions|CO2', 'Emissions|CO2|Energy and Industrial Processes', 'Emissions|CH4', 'Primary Energy',
                 'Secondary Energy|Electricity|Nuclear', 'Secondary Energy|Wind', 'Secondary Energy|Solar']
 
 # Error Messages

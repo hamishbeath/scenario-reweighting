@@ -9,7 +9,10 @@ from tqdm import tqdm
 from constants import *
 from itertools import combinations
 from utils.file_parser import read_csv
-from utils.utils import add_meta_cols
+from utils.utils import add_meta_cols, data_download_sub
+from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
+from scipy.spatial.distance import squareform
+from sklearn.metrics import silhouette_score
 
 
 
@@ -22,30 +25,25 @@ def main():
     Run the sigma calculation for the AR6 pathways.
     """
     
-    ar6_tier_0_data = read_csv(INPUT_DIR + 'ar6_pathways_tier0.csv')
+    # ar6_tier_0_data = read_csv(INPUT_DIR + 'ar6_pathways_tier0.csv')
     # sigma_values = calculate_sigma_SSP_RCP(ar6_tier_0_data, SSP_SCENARIOS, TIER_0_VARIABLES)
     # sigma_values.to_csv(OUTPUT_DIR + 'sigma_value_0.00_1.00.csv', index=False)
     
     # # calculate_pairwise_rms_distances(data_for_diversity, TIER_0_VARIABLES, 'sci', start_year=2020, end_year=2100)
-    
-    """
-    Run the variable weights calculation for the AR6 pathways in a loop.
-    """
-    # pairwise_rms = read_csv(OUTPUT_DIR + 'pairwise_rms_distances_ar6.csv')
-    # sigma_values = read_csv(OUTPUT_DIR + 'sigma_value_ar6.csv')
-    # sigmas_values = sigma_values.set_index('Variable')
-    # # sigmas_to_run = np.arange(0.05, 0.95, 0.05)
-    # sigmas_to_run = ['0.00', '1.00']
-    # for sigma in tqdm(sigmas_to_run):
 
-    #     if isinstance(sigma, float):
-    #         sigma_string = f"{sigma:.2f}"
-    #     else:
-    #         sigma_string = sigma
-    #     # sigma_string = f"{sigma:.2f}"
-    #     # if str(sigma) in exclude:
-    #     #     continue
-        
+    # sci_pathways = data_download_sub(TIER_0_VARIABLES, '*', '*', '*', 'World', 2100, database='sci')
+    # sci_pathways.to_csv(INPUT_DIR + 'sci_pathways_tier0_CCS.csv', index=False)
+
+    """
+    Run the variable weights calculation 
+    """
+    # pairwise_rms_sci = read_csv(OUTPUT_DIR + 'pairwise_rms_distances_sci.csv')
+    # sigma_values = read_csv(OUTPUT_DIR + 'sigma_value_ar6.csv')
+    # sigma_values = sigma_values.set_index('Variable')
+    # calculate_range_variable_weights(pairwise_rms_sci, sigma_values, 'sci', variables=TIER_0_VARIABLES_SCI)
+
+    sigmas = ['0.0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0']
+    # determine_sigma_greatest_diversity('sci', sigmas, TIER_0_VARIABLES_SCI)    
     #     sigma_variables = sigmas_values[sigma_string].to_dict()
     #     print(sigma_variables)
     #     calculate_variable_weights(pairwise_rms, sigma_variables, 'ar6', sigma_string + '_sigma', return_df=True)
@@ -57,13 +55,12 @@ def main():
     Composite weights calculation for the AR6 pathways.
 
     """
-    sigma_string = '0.00'
-    # scenario_variable_weights = read_csv(OUTPUT_DIR + 'variable_weights_ar6_ar6_median_weights.csv')
-    
-    scenario_variable_weights = read_csv(OUTPUT_DIR + f'variable_weights_ar6_{sigma_string}_sigma.csv')
-    calculate_composite_weight(scenario_variable_weights, ar6_tier_0_data, 
-                               'ar6_' + sigma_string + '_sigma_energy_weights', VARIABLE_INFO_ENERGY, flat_weights=None)
-
+    sigma_string = '0.5'
+    database = 'sci'
+    sci_timeseries_data = read_csv(INPUT_DIR + 'sci_pathways.csv')
+    scenario_variable_weights = read_csv(OUTPUT_DIR + f'variable_weights_{database}_{sigma_string}_sigma.csv')
+    calculate_composite_weight(scenario_variable_weights, sci_timeseries_data, 
+                               database + '_' + sigma_string + '_sigma_expert_weights', VARIABLE_INFO_SCI, flat_weights=None)
 
     # meta = read_csv(INPUT_DIR + 'ar6_meta_data.csv')
     # variable_data = add_meta_cols(ar6_tier_0_data, meta, metacols=['Category'])
@@ -76,8 +73,35 @@ def main():
     # test_correlation(variable_data, ['Carbon Sequestration|CCS', 'Primary Energy|Non-Biomass Renewables'])
     # get_snapshot_variable_correlation(variable_data, TIER_0_VARIABLES, 'ar6_snapshot')
     # correlation_matrix_global = pd.read_csv(OUTPUT_DIR + 'variable_correlation_matrix_ar6_snapshot_SNAPSHOT.csv', index_col=0)
+    # find_optimal_threshold(correlation_matrix_global, method='average')
+    # thresholds, silo = evaluate_clustering_quality(correlation_matrix_global, method='average')
+    # print(thresholds)
+    # hca = run_hierarchical_clustering(correlation_matrix_global, threshold=0.5)
+    
+    # # save the clustering results as csv
+    # # hca_df = pd.DataFrame(hca)
+    # # hca_df.to_csv(OUTPUT_DIR + 'hierarchical_clustering_results.csv', index=False)
+    # cluster_output = pd.DataFrame({
+    #     'Cluster': [f'Cluster {i+1}' for i in range(len(hca))],
+    #     'Variables': [', '.join(cluster) for cluster in hca]
+    # })
+    # cluster_output.to_csv(OUTPUT_DIR + 'hierarchical_clustering_results.csv', index=False)
+    # plot_dendrogram_with_threshold(correlation_matrix_global, method='average')
     # new_variable_weights = compute_weights_flat(correlation_matrix_global)
-    # print(new_variable_weights)
+    # # print(new_variable_weights)
+
+
+
+def calculate_range_variable_weights(database_pairwise, sigma_file, database, variables=TIER_0_VARIABLES):
+
+    sigmas = ['0.0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0']
+    print(sigma_file)
+    for sigma in sigmas:
+        sigma_values = sigma_file[sigma].to_dict()
+        print(sigma_values)
+        calculate_variable_weights(database_pairwise, sigma_values, database, sigma + '_sigma', variables)
+        print(f"Variable weights calculated for sigma {sigma}")
+
 
 
 # Function to Calculate sigma values
@@ -261,7 +285,7 @@ def rms(i, j):
 
 
 # Function that reweights the scenarios based on the pairwise RMS distances and the signma input
-def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, return_df=False):
+def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, variables, return_df=False):
 
     """
     Calculate weights for each variable and scenario based on pairwise RMS distances and sigma values.
@@ -289,7 +313,7 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, ret
     n = len(model_scen_list)
 
     # Unique variable (may vary depending on the database, see docs)
-    variables = pairwise_rms_df['Variable'].unique()
+    # variables = pairwise_rms_df['Variable'].unique()
 
     # loop through each variable 
     for variable in tqdm(variables, desc="Calculating weights by variable"):
@@ -448,6 +472,7 @@ def calculate_composite_weight(weighting_data_file, original_scenario_data, outp
     output_df.to_csv(OUTPUT_DIR + f'composite_weights_{output_id}.csv', index=False)
     return output_df
 
+
 # function that provides a new set of weights for the scenarios that are missing variables
 def adjust_weights_for_missing_variables(missing_variables, variable_info):
     
@@ -485,7 +510,7 @@ def adjust_weights_for_missing_variables(missing_variables, variable_info):
             subgroup_weights = [variable_info[var]['subgroup_weight'] for var in group_variables]
             if sum(subgroup_weights) != 1:
                 for var in group_variables:
-                    variable_info[var]['subgroup_weight'] = variable_info[var]['subgroup_weight'] / sum(subgroup_weights)
+                    variable_info[var]['subgroup_weight'] = variable_info[var]['subgroup_weight'] / (sum(subgroup_weights) + 1e-8)
 
     return variable_info
 
@@ -717,6 +742,7 @@ def get_snapshot_variable_correlation(variable_data, variables, output_id):
     yearly_corrs_df.to_csv(os.path.join(OUTPUT_DIR, f'variable_correlation_matrix_{output_id}_SNAPSHOT_YEARLY.csv'))
     return mean_corr, yearly_corrs
 
+
 # Function to compute weights while preserving group structure
 def compute_weights_preserve_group(corr_matrix, variable_info):
     group_vars = {}
@@ -770,11 +796,119 @@ def compute_weights_flat(corr_matrix):
     return weights.to_dict()
  
 
+def run_hierarchical_clustering(corr_matrix, threshold=0.5):
+    """
+    Perform hierarchical clustering on the correlation matrix and return clusters of variables.
+    
+    Parameters:
+    - corr_matrix (DataFrame): The correlation matrix of variables.
+    - threshold (float): The threshold for clustering. Default is 0.5.
+    
+    Returns:
+    - clusters (list): List of lists, where each inner list contains variable names in a cluster.
+    """
+    
+    # # Check for high correlations
+    # high_corr_pairs = []
+    # for i in range(len(corr_matrix.columns)):
+    #     for j in range(i+1, len(corr_matrix.columns)):
+    #         corr_val = corr_matrix.iloc[i,j]
+    #         if abs(corr_val) > 0.6:  # adjust threshold as needed
+    #             high_corr_pairs.append((corr_matrix.columns[i], 
+    #                                     corr_matrix.columns[j], 
+    #                                     corr_val))
+
+    # print(f"Found {len(high_corr_pairs)} pairs with |correlation| > 0.6:")
+    # for pair in high_corr_pairs[:10]:  # show first 10
+    #     print(f"{pair[0]} - {pair[1]}: {pair[2]:.3f}")
+
+    from scipy.cluster.hierarchy import linkage, fcluster
+    from scipy.spatial.distance import squareform
+
+    # Convert correlation to distance
+    distance_matrix = 1 - corr_matrix.abs()
+    condensed_distances = squareform(distance_matrix)
+
+    # Perform hierarchical clustering
+    linkage_matrix = linkage(condensed_distances, method='average')
+
+    # Form flat clusters
+    cluster_labels = fcluster(linkage_matrix, threshold, criterion='distance')
+
+    # Group variables by cluster labels
+    clusters = {}
+    for var, label in zip(corr_matrix.columns, cluster_labels):
+        clusters.setdefault(label, []).append(var)
+
+    return list(clusters.values())
 
 
-
-
+def find_optimal_threshold(corr_matrix, method='average'):
+    distance_matrix = 1 - corr_matrix.abs()
+    condensed_distances = squareform(distance_matrix)
+    linkage_matrix = linkage(condensed_distances, method=method)
+    
+    thresholds = np.arange(0.1, 1.0, 0.05)
+    n_clusters = []
+    
+    for threshold in thresholds:
+        clusters = fcluster(linkage_matrix, threshold, criterion='distance')
+        n_clusters.append(len(np.unique(clusters)))
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(thresholds, n_clusters, 'bo-')
+    plt.xlabel('Threshold')
+    plt.ylabel('Number of Clusters')
+    plt.title('Number of Clusters vs Threshold')
+    plt.grid(True)
+    plt.show()
+    
+    return thresholds, n_clusters
   
+
+def evaluate_clustering_quality(corr_matrix, method='average'):
+    distance_matrix = 1 - corr_matrix.abs()
+    condensed_distances = squareform(distance_matrix)
+    linkage_matrix = linkage(condensed_distances, method=method)
+    
+    thresholds = np.arange(0.2, 0.8, 0.05)
+    silhouette_scores = []
+    
+    for threshold in thresholds:
+        clusters = fcluster(linkage_matrix, threshold, criterion='distance')
+        if len(np.unique(clusters)) > 1:  # Need at least 2 clusters
+            score = silhouette_score(distance_matrix, clusters, metric='precomputed')
+            silhouette_scores.append(score)
+        else:
+            silhouette_scores.append(-1)
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(thresholds, silhouette_scores, 'go-')
+    plt.xlabel('Threshold')
+    plt.ylabel('Silhouette Score')
+    plt.title('Clustering Quality vs Threshold')
+    plt.grid(True)
+    plt.show()
+    
+    best_idx = np.argmax(silhouette_scores)
+    return thresholds[best_idx], silhouette_scores[best_idx]
+
+
+def plot_dendrogram_with_threshold(corr_matrix, method='average'):
+    distance_matrix = 1 - corr_matrix.abs()
+    condensed_distances = squareform(distance_matrix)
+    linkage_matrix = linkage(condensed_distances, method=method)
+    
+    plt.figure(figsize=(12, 8))
+    dendrogram(linkage_matrix, labels=corr_matrix.columns, orientation='top', leaf_rotation=45)
+    plt.axhline(y=0.4, color='red', linestyle='--', label='Threshold=0.4')
+    plt.axhline(y=0.5, color='orange', linestyle='--', label='Threshold=0.5')
+    plt.xlabel('Distance')
+    plt.title('Hierarchical Clustering Dendrogram')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
   
 if __name__ == "__main__":
     main()
