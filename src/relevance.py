@@ -25,6 +25,20 @@ def main():
 # Function that calculates the relevance weighting for a given set of scenarios.
 def calculate_relevance_weighting(df, categories, steepness=10, meta_variables=dict):
 
+    """
+    Function for calculating relevance weighting for scenarios
+
+    Inputs:
+    - df: DataFrame containing scenario data, containing scenario list and meta variables
+    - categories: List of categories to calculate relevance weighting for
+    - steepness: Steepness parameter for the sigmoid function
+    - meta_variables: Dictionary defining the relevance variables and their weights for each category
+    
+    Outputs:
+    - output_df: DataFrame containing the relevance weighting for each scenario in each category
+    
+    """
+    
     output_df = pd.DataFrame()
     
     # loop through the categories
@@ -56,22 +70,8 @@ def calculate_relevance_weighting(df, categories, steepness=10, meta_variables=d
 
 
 def sigmoid_weight(value, midpoint, steepness=10):
-    """Sigmoid-based weighting function."""
     return 1 / (1 + np.exp(steepness * (value - midpoint)))
 
-
-# def calculate_normalised_relevance(df, category='C1', steepness=10):
-#     """Add a column to df with normalised relevance scores (summing to 1)."""
-#     df = df.copy()
-
-#     midpoints = {var: df[df['Category'] == category][var].median() for var in weights}
-
-#     df['raw_relevance'] = df.apply(
-#         lambda row: compute_relevance_score(row, category, steepness), axis=1
-#     )
-#     total = df['raw_relevance'].sum()
-#     df['relevance_weight'] = df['raw_relevance'] / total if total > 0 else 0.0
-#     return df
 
 
 

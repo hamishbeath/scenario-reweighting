@@ -30,12 +30,12 @@ def main():
     """
     meta_data = read_csv(INPUT_DIR + 'ar6_meta_data.csv')
     quality_weighting_data = read_csv(OUTPUT_DIR + 'quality_weighting_data.csv')
-    quality_weights = calculate_quality_weighting(quality_weighting_data, meta_data, plot_scatter=False,
+    quality_weights = calculate_quality_weighting(quality_weighting_data, meta_data,
     interpolate=True)
     quality_weights.to_csv(OUTPUT_DIR + 'quality_weights_ar6.csv')
 
 
-def calculate_quality_weighting(scenario_data, meta_data, vetting_criteria=VETTING_CRITERIA, plot_scatter=False,
+def calculate_quality_weighting(scenario_data, meta_data, vetting_criteria=VETTING_CRITERIA,
                                  interpolate=False):
 
     """
@@ -43,7 +43,9 @@ def calculate_quality_weighting(scenario_data, meta_data, vetting_criteria=VETTI
     
     Inputs:
     - scenario_data: DataFrame containing the scenario data required for the quality weighting.
+    - meta_data: DataFrame containing the meta data for the scenarios.
     - vetting_criteria: dict containing the vetting criteria variables.
+    - interpolate: bool indicating whether to interpolate the scenario data.
 
     Returns:
     - DataFrame with 'quality_weighting' for each of the scenarios, with scenario, model, 
@@ -61,7 +63,7 @@ def calculate_quality_weighting(scenario_data, meta_data, vetting_criteria=VETTI
     output_df = output_df.set_index(['Scenario', 'Model'])
     
     if interpolate:
-        # Implement interpolation logic here
+        # interpolate the scenario data
         scenario_data = interpolate_quality_vars(scenario_data)
         scenario_data = scenario_data.reset_index()
         print(scenario_data)
@@ -109,27 +111,9 @@ def calculate_quality_weighting(scenario_data, meta_data, vetting_criteria=VETTI
         criteria_sums_passed[criteria + '_quality_weighting'] = np.exp(-criteria_sums_passed['scaled_d']**2)
         criteria_sums_passed = criteria_sums_passed.drop(columns=['pass', 'scaled_d', target_year])
 
-
-        if plot_scatter == True:
-            # plot scatter plot of the quality weighting
-            import matplotlib.pyplot as plt
-            plt.style.use('seaborn-darkgrid')
-            plt.figure(figsize=(10, 5))
-            plt.scatter(criteria_sums_passed['quality_distance'], criteria_sums_passed[criteria + '_quality_weighting'], alpha=0.5)
-
-            # plt.hist(criteria_sums_passed['quality_distance'], bins=50, alpha=0.5, label='Quality Distance')
-            plt.xlabel('Quality Distance')
-            plt.ylabel('Quality Weighting')
-            plt.title(f'Quality Weighting and Distance for {criteria}')
-            plt.legend()
-            plt.show()
-        
         # set the index to Scenario and Model
         criteria_sums_passed = criteria_sums_passed.set_index(['Scenario', 'Model'])
         criteria_sums_passed = criteria_sums_passed.rename(columns={'quality_distance': criteria + '_quality_distance'})
-
-        # print(criteria_sums_passed)
-
 
         # join the criteria sums passed to the output dataframe on the index
         output_df = pd.concat([output_df, criteria_sums_passed], axis=1)
@@ -145,24 +129,23 @@ def calculate_quality_weighting(scenario_data, meta_data, vetting_criteria=VETTI
     return output_df
 
 
-# Interpolate years 
+# sub function for interpolation of quality variables
 def interpolate_quality_vars(scenario_data):
 
     interpolated_df = scenario_data.copy()
-
-    # Get the years from start_year to end_year
+    
+    # create list of years to interpolate
     years = [year for year in range(2010, 2025)]
 
-    # Define the columns that identify a unique time series
+    # Unique time series identifiers
     group_cols = ['Model', 'Scenario', 'Variable']
-
+    
     # melt to long format
     df_melted = pd.melt(interpolated_df, id_vars=group_cols, var_name='Year', value_name='Value')
 
     # years as ints
     df_melted['Year'] = df_melted['Year'].astype(int)
 
-    # Filter the melted dataframe to only include the years of interest
     df_melted = df_melted[df_melted['Year'].isin(years)]
 
     # Group by the identifying columns and interpolate within each group
@@ -171,18 +154,15 @@ def interpolate_quality_vars(scenario_data):
         group_indexed = group.set_index('Year')
         full_years = pd.Index(years, name='Year')
         group_reindexed = group_indexed.reindex(full_years)
-        # Interpolate the Value column
         group_reindexed['Value'] = group_reindexed['Value'].interpolate(method='linear')
-
         group_reindexed = group_reindexed.ffill()
         return group_reindexed.reset_index()
     
     # Apply interpolation to each group
     df_interpolated = df_melted.groupby(group_cols, group_keys=False).apply(interpolate_group)
     
-    # convert back to wide format using pivot
+    # Back to wide format for continued processing
     df_interpolated = df_interpolated.pivot(index=group_cols, columns='Year', values='Value')
-    print(df_interpolated)
     return df_interpolated
 
 

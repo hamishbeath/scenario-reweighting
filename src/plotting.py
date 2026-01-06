@@ -11,6 +11,12 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from constants import *
 from utils import read_csv, add_meta_cols, model_family, data_download_sub
 from matplotlib.patches import Patch
+from matplotlib.path import Path
+from matplotlib.patches import PathPatch, Wedge, Circle
+from matplotlib.lines import Line2D
+from textwrap import shorten
+
+
 
 # Set up global plot params
 plt.rcParams['font.size'] = 7
@@ -28,31 +34,31 @@ def main() -> None:
 
 
     ar6_meta = read_csv('inputs/ar6_meta_data')
-    
-
     model_family_df = read_csv('inputs/model_family.csv')
     df_results = read_csv('outputs/quality_weights_ar6.csv')
+    
     # df_results = add_meta_cols(df_results, ar6_meta, ['Category', 'Project_study'])
-
     # create_database_impact_variable(df_results, 'Primary Energy|Coal', GROUP_MODES)
     # # plot_timeseries(df_results, harmonised_emissions_data)
     # # df_results = read_csv('outputs/relevance_weighting.csv')
 
     # variable_weight_subplots_sigma_sensitivity(sigmas, timeseries_data, TIER_0_VARIABLES, categories=['C1', 'C2'], meta=ar6_meta)
 
-    # iqr_sigma = read_csv('outputs/sigma_greatest_diversity_sci.csv')
+    iqr_sigma = read_csv('outputs/sigma_greatest_diversity_ar6.csv')
     # plot_sigma_quantiles_IQR_ranges(iqr_sigma)
     
-    sigma = '0.70'
-    weighting_approach = 'flat'
+    sigma = '0.2'
+    weighting_approach = 'correl'
     database = 'ar6'
     # sci_pathways = read_csv(INPUT_DIR + 'sci_pathways.csv')
     # sci_meta = read_csv(INPUT_DIR + 'sci_pathways_with_meta.csv')
-    # ar6_pathways = read_csv(INPUT_DIR + 'ar6_pathways_tier0.csv')
-    # variable_weight_subplots_sigma_sensitivity(SIGMAS_AR6, 
-    #                                             ar6_pathways, 
-    #                                             TIER_0_VARIABLES, 'ar6', categories=['C1', 'C2'], 
-    #                                             meta=ar6_meta)
+    
+    ar6_pathways = read_csv(INPUT_DIR + 'ar6_pathways_tier0.csv')
+    # sigmas_others = ['log_below_1', 'log_below_2', 'log_below_3', 'log_below_4', 'log_below_5', 'log_below_6']
+    # variable_weight_subplots_sigma_sensitivity(SIGMAS_SCI,
+    #                                             ar6_pathways,
+    #                                             TIER_0_VARIABLES, 'ar6', categories=CATEGORIES_ALL,
+    #                                             meta=ar6_meta, sigma_others=sigmas_others)
     
     # sci_median = read_csv(OUTPUT_DIR + 'variable_weights_sci_0.5_sigma.csv')
     # variable_weight_subplots(sci_median,
@@ -60,10 +66,10 @@ def main() -> None:
     #                         TIER_0_VARIABLES_SCI, 'sci', categories=['C1b', 'C2'], 
     #                         meta=sci_meta)
 # Function that takes the variable weights individually, and applies them to each of the variables
-    composite_weights_data = read_csv(OUTPUT_DIR + f'composite_weights_{database}_{sigma}_sigma_{weighting_approach}_weights.csv')
-    # variable_weight_subplots_composite(composite_weights_data, 
-    #                                    sci_pathways, TIER_0_VARIABLES_SCI, 'sci',
-    #                                    categories=['C1b', 'C2'], meta=sci_meta)
+    composite_weights_data = read_csv(DIVERSITY_OUTPUT_DIR + f'composite_weights_{database}_{sigma}_sigma_{weighting_approach}_weights.csv')
+    # variable_weight_subplots_composite(df_results, 
+    #                                    ar6_pathways, TIER_0_VARIABLES, 'ar6',
+    #                                    categories=['C2'], meta=ar6_meta)
 
     # sci_meta = sci_meta[sci_meta['year'] == 2050]
     # sci_meta = sci_meta[sci_meta['variable'] == 'Emissions|CO2']
@@ -72,11 +78,11 @@ def main() -> None:
     # sci_meta = model_family(sci_meta, model_family_df)
 
     # join the sci meta to composite weights on Model and Scenario, keeping structure of composite_weights_data
-    # composite_weights_data = composite_weights_data.merge(sci_meta, on=['Model', 'Scenario'], how='left')
-    scenario_list = ['0.00_sigma_expert', '0.70_sigma_expert', '0.70_sigma_flat']
-    scenario_titles = ['Low sigma, \nExpert', 'High Sigma, \nExpert', 'High Sigma, \nCorrelation Adjusted']
-    categories_run = [CATEGORIES_ALL, ['C1'], ['C1a_NZGHGs'], ['C2']]
-    create_database_impact_subplots(scenario_list, scenario_titles, ['Model_family', 'Model_type', 'Project_study'], ar6_meta, model_family_df, 'ar6', categories_run)
+    scenario_list = ['log_below_4_sigma_expert', '0.2_sigma_expert', 'log_below_4_sigma_correl', '0.2_sigma_correl']
+    scenario_list = ['log_below_4_sigma_correl', '0.2_sigma_correl', 'log_below_4_sigma_expert', '0.2_sigma_expert']
+    scenario_titles = ['Low sigma, \nExpert', 'Higher Sigma, \nExpert', 'Low Sigma, \nCorrelation Adjusted', 'Higher Sigma, \nCorrelation Adjusted']
+    categories_run = [CATEGORIES_ALL, ['C1'], ['C2']]
+    # create_database_impact_subplots(scenario_list, scenario_titles, ['Model_family', 'Model_type', 'Project_study'], ar6_meta, model_family_df, 'ar6', categories_run)
 
     # boxplots_sci_weighting(composite_weights_data, sci_meta, ['Climate Assessment|Peak Warming|Median [MAGICCv7.5.3]', 
     #                                                           'Climate Assessment|Warming in 2100|Median [MAGICCv7.5.3]'], 
@@ -86,41 +92,54 @@ def main() -> None:
     Quality weight plots
     """
     # Function that produces boxplots for key variables for quality weighting
-    # boxplots_quality_weighting(df_results, harmonised_emissions_data, 
-    #                             ar6_meta,
-    #                             test_variables=['AR6 climate diagnostics|Infilled|Emissions|CO2',
-    #                             'Median warming in 2100 (MAGICCv7.5.3)'],
-    #                              variables_year=[2050, None], categories=CATEGORIES_ALL)
+
     # old_results = read_csv(INPUT_DIR + 'ar6_data_project_harmonised.csv')
     # histogram_weighting(df_results, plot_mode='Quality', meta_data=ar6_meta)
-    # quality_diversity_weights(df_results, composite_weights_data, 'Category', model_family_df, meta_data=ar6_meta)
-    # timeseries_data = read_csv('inputs/ar6_pathways_tier0.csv')
+    # quality_diversity_weights(df_results, composite_weights_data, 'Project_study', model_family_df, meta_data=ar6_meta)
+    timeseries_data = read_csv('inputs/ar6_pathways_tier0.csv')
     harmonised_emissions_data = read_csv(INPUT_DIR + 'AR6_harmonised_emissions_data.csv')
-    # plot_timeseries(composite_weights_data, harmonised_emissions_data, meta_data=ar6_meta)
-    combined_weights = read_csv(OUTPUT_DIR + f'combined_weights_{database}_{sigma}_sigma_{weighting_approach}_weights.csv')
+    # plot_timeseries(df_results, harmonised_emissions_data, meta_data=ar6_meta)
+    # combined_weights = read_csv(OUTPUT_DIR + f'combined_weights_{database}_{sigma}_sigma_{weighting_approach}_weights.csv')
+
+    weights_with_meta = add_meta_cols(composite_weights_data, ar6_meta.copy(), ['Category', 'Category_subset', 'Project_study', 'Median peak warming (MAGICCv7.5.3)'])
+    weights_with_meta = model_family(weights_with_meta, model_family_df.copy(), Model_type=True)
+    # output_df = weights_with_meta.copy().to_csv(DIVERSITY_OUTPUT_DIR + f'composite_weights_{database}_{sigma}_sigma_{weighting_approach}_weights_with_meta.csv', index=False)
+    # weights_with_meta['Scenario_model'] = weights_with_meta['Scenario'] + weights_with_meta['Model']
+    output_df = weights_with_meta.copy().to_csv(DIVERSITY_OUTPUT_DIR + f'composite_weights_{database}_{sigma}_sigma_{weighting_approach}_weights_with_meta.csv', index=False)
+    # boxplots_quality_weighting(weights_with_meta, harmonised_emissions_data,
+    #                             ar6_meta,
+    #                             test_variables=['AR6 climate diagnostics|Infilled|Emissions|CO2',
+    #                             'Median peak warming (MAGICCv7.5.3)'],
+    #                              variables_year=[2050, None], categories=['C1', 'C1a_NZGHGs', 'C2'])
 
     """
     Violin plots
     """
 
-    # weights = read_csv(OUTPUT_DIR + f'composite_weights_{database}_{sigma}_sigma_{weighting_approach}_weights.csv')
+    weights = read_csv(DIVERSITY_OUTPUT_DIR + f'composite_weights_{database}_{sigma}_sigma_{weighting_approach}_weights.csv')
     ar6_data = read_csv(INPUT_DIR + 'ar6_data_with_plotting_meta.csv')
-    # sci_data 
 
-    # # add the weight column to the ar6_data
+
+    # add the weight column to the ar6_data
     ar6_data = ar6_data.set_index(['Model', 'Scenario'])
-    ar6_data['Weight'] = ar6_data.index.map(combined_weights.set_index(['Model', 'Scenario'])['Weight'])
+    ar6_data['Weight'] = ar6_data.index.map(weights.set_index(['Model', 'Scenario'])['Weight'])
     ar6_data = ar6_data.reset_index()
+    save_fig = f'{database}_{sigma}_{weighting_approach}'
+    # violin_plots(ar6_data, ['C1', 'C1a_NZGHGs', 'C2'], save_fig=None)
+    
+    """
+    Correlation plots
+    """
 
-    save_fig = f'{database}_{sigma}_{weighting_approach}_combined'
-    # violin_plots(ar6_data, ['C1', 'C1a_NZGHGs', 'C2'], save_fig=save_fig)
+    # correl_matrix = pd.read_csv(OUTPUT_DIR + 'variable_correlation_matrix_ar6_snapshot_SNAPSHOT.csv', index_col=0)
+    # plot_dendrogram_with_threshold(correl_matrix)
 
     """
     Timeseries weight plots
     """
     # variable_weight_subplots_composite(weights, 
-    #                                     timeseries_data, TIER_0_VARIABLES, 
-    #                                     categories=['C1', 'C2'], meta=ar6_meta)
+    #                                     timeseries_data, TIER_0_VARIABLES, database,
+    #                                     categories=['C1','C2'], meta=ar6_meta)
 
 
     """
@@ -128,9 +147,207 @@ def main() -> None:
     
 
     """
-    # jackknife_data = read_csv(OUTPUT_DIR + f'jackknife_results_ar6_{weighting_approach}_{sigma}.csv')
+    jackknife_data = read_csv(DIVERSITY_OUTPUT_DIR + f'jackknife_results_ar6_{weighting_approach}_{sigma}.csv')
     # jackknife_stick_plots_category_side(jackknife_data, ['Model_family', 'Project'], CATEGORIES_15, ASSESSMENT_VARIABLES)
 
+    """
+    Database impact heatmaps
+
+    """
+    filenames = ['c1_mitigation_impact_heatmap.csv', 'c2_mitigation_impact_heatmap.csv']
+    titles = ['C1', 'C2']
+
+    down_cols = ['Net zero CO2 year_harmonised', 'Net zero GHG year_harmonised', 
+    'Median peak warming (MAGICCv7.5.3)', 'Final Energy_cumulative', 
+    'Primary Energy|Coal_cumulative', 'Primary Energy|Oil_cumulative', 
+    'Primary Energy|Gas_cumulative'] + ['Carbon Sequestration|CCS_cumulative', 
+    'Primary Energy|Non-Biomass Renewables_cumulative', 
+    'Primary Energy|Nuclear_cumulative']
+
+    up_cols = []
+
+    create_heatmaps_weighting_outcomes(filenames, titles, down_cols, up_cols, include_cols=['Final Energy_cumulative', 'Primary Energy|Coal_cumulative',
+                                                                                            'Primary Energy|Oil_cumulative', 'Primary Energy|Gas_cumulative',
+                                                                                         'Carbon Sequestration|CCS_cumulative',
+                                                                                         'Primary Energy|Non-Biomass Renewables_cumulative',
+                                                                                         'Primary Energy|Nuclear_cumulative'])
+
+#     plot_diversity_weight_impact(
+#         df=weights_with_meta,
+#         weight_col="Weight",
+#         left_rank_by_col="Model_family",
+#         right_rank_by_col="Project_study",
+#         left_group_col="Model_family",
+#         right_group_col="Project_study",
+#         scenario_col="Scenario_model",
+#         ascending_left=True,
+#         ascending_right=True,
+#         subselect=(weights_with_meta["Category"].isin(["C2"])),
+#         left_color_map=MODES_COLOURMAPS['Model_family'],
+#         right_color_map=MODES_COLOURMAPS['Project_study'],
+#         line_alpha=0.2,
+#         line_alpha_highlight=0.8,
+# )
+    file_ids = ['ar6_all_0.2_correl',
+                "['C1', 'C2', 'C3', 'C4', 'C5', 'C6']_0.2_correl",
+                 "['C1', 'C2', 'C3', 'C4']_0.2_correl",
+                 "['C1', 'C2']_0.2_correl"]
+    category_groupings = ['All', 'C1-C6', 'C1-C4', 'C1 & C2']
+    variable = 'Primary Energy|Non-Biomass Renewables'
+
+
+    # variable_weight_subplot_composite_database_subset(file_ids=file_ids,
+    #                                                   category_groupings=category_groupings,
+    #                                                   variable=variable,
+    #                                                   meta=ar6_meta,
+    #                                                   timeseries_data=timeseries_data,
+    #                                                   file_dir=DIV_SENSITIVITY_OUTPUT_DIR,
+    #                                                   plotting_categories=['C1', 'C2'])
+
+
+
+
+# def make_specific_variable_boxplots(df_results, categories=list, variables=list)
+
+
+# plot that creates a set of heatmap(s), one for each input file
+def create_heatmaps_weighting_outcomes(inputs=list, plot_titles=list, down_cols=list, up_cols=list, include_cols=list):
+
+    """
+    Function that takes input files and creates heatmaps with a comparison between 
+    the unweighted values and the other values in each column. 
+    Inputs: 
+    - inputs: list of input file paths
+    - plot_titles: list of titles for each plot
+
+    """
+    #params:
+    # set font size
+
+
+
+    # set of subplots with rows as n(inputs)
+    fig, axs = plt.subplots(len(inputs),1, figsize=(8, 5*len(inputs)), sharex=True)
+    if len(inputs) == 1:
+        axs = [axs] # ensure axs is always iterable
+
+    data_frames = []
+    percent_diff_frames = []
+    global_vmax = 0
+    epsilon = 1e-9
+
+    # First pass: read data, calculate percentage differences, and find the global max for color scaling
+    for input_file in inputs:
+        df = read_csv('revisions/' + input_file)
+        df = df.set_index(['Variable Weights', 'Sigma'], drop=True)
+        
+        # Keep only specified columns if provided
+        if include_cols:
+            df = df[include_cols]
+        
+        # Reorder columns
+        ordered_cols = [col for col in down_cols if col in df.columns] + [col for col in up_cols if col in df.columns]
+        df = df[ordered_cols]
+        data_frames.append(df)
+
+        baseline = df.iloc[0]
+        baseline_safe = baseline.replace(0, epsilon)
+        df_percent_diff = (df - baseline) / baseline_safe * 100
+        percent_diff_frames.append(df_percent_diff)
+        
+        current_vmax = np.abs(df_percent_diff.values).max()
+        if current_vmax > global_vmax:
+            global_vmax = current_vmax
+
+    corner_letter = 'a'
+    # Second pass: create the heatmaps using the global vmax
+    for i, (df, df_percent_diff) in enumerate(zip(data_frames, percent_diff_frames)):
+        # Only show the colorbar on the last plot
+        show_cbar = (i == len(data_frames) - 1)
+
+        # Create a data copy for coloring, flipping signs for 'up' columns
+        # so that 'good' changes (positive for 'up', negative for 'down') are cool colors
+        df_color_data = df_percent_diff.copy()
+        for col in up_cols:
+            if col in df_color_data.columns:
+                df_color_data[col] *= -1
+        
+        sns.heatmap(df_color_data, ax=axs[i], cmap='PiYG_r',
+                    annot=df, center=0, vmax=global_vmax, vmin=-global_vmax, 
+                    linewidths=0.5, fmt='1.1f', linecolor='white')
+
+        # Add a vertical line to separate 'down' and 'up' columns
+        num_down_cols = sum(1 for col in down_cols if col in df.columns)
+        if num_down_cols > 0 and num_down_cols < len(df.columns):
+            axs[i].axvline(x=num_down_cols, color='black', linewidth=2)
+
+        axs[i].set_title(plot_titles[i])
+        
+        # add a letter to the top left corner of each subplot
+        axs[i].text(-0.1, 1.05, corner_letter, transform=axs[i].transAxes, fontsize=7, fontweight='bold', va='top')
+        corner_letter = chr(ord(corner_letter) + 1)
+
+    plt.tight_layout()
+    plt.show()
+
+
+# plot that creates a set of heatmap(s), one for each input file
+def create_heatmaps_weighting_outcomes_div_indicators(inputs=list, plot_titles=list):
+
+    """
+    Function that takes input files and creates heatmaps with a comparison between 
+    the unweighted values and the other values in each column. 
+    Inputs: 
+    - inputs: list of input file paths
+    - plot_titles: list of titles for each plot
+
+    """
+    #params:
+    # plt.rcParams['axes.fontsize'] = 7
+
+    # set of subplots with rows as n(inputs)
+    fig, axs = plt.subplots(1,len(inputs), figsize=(10, 5), sharey=True)
+    if len(inputs) == 1:
+        axs = [axs] # ensure axs is always iterable
+
+    data_frames = []
+    percent_diff_frames = []
+    global_vmax = 0
+    epsilon = 1e-9
+
+    # First pass: read data, calculate percentage differences, and find the global max for color scaling
+    for input_file in inputs:
+        df = read_csv('revisions/' + input_file)
+        df = df.drop(columns=['Category'])
+        df = df.set_index(['Variable Weights', 'Sigma'], drop=True)
+        data_frames.append(df)
+
+        baseline = df.iloc[0]
+        baseline_safe = baseline.replace(0, epsilon)
+        df_percent_diff = (df - baseline) / baseline_safe * 100
+        percent_diff_frames.append(df_percent_diff)
+        
+        current_vmax = np.abs(df_percent_diff.values).max()
+        if current_vmax > global_vmax:
+            global_vmax = current_vmax
+
+    corner_letter = 'a'
+    # Second pass: create the heatmaps using the global vmax
+    for i, (df, df_percent_diff) in enumerate(zip(data_frames, percent_diff_frames)):
+        # Only show the colorbar on the last plot
+        show_cbar = (i == len(data_frames) - 1)
+        sns.heatmap(df_percent_diff, ax=axs[i], cmap='coolwarm',
+                    annot=df, fmt=".3f", center=0, vmax=global_vmax, vmin=-global_vmax, cbar=show_cbar)
+        axs[i].set_title(plot_titles[i])
+        # # put x axis labels at 45 degrees
+        # axs[i].set_xticklabels(axs[i].get_xticklabels(), rotation=45)
+
+        # add a letter to the top left corner of each subplot
+        axs[i].text(-0.1, 1.05, corner_letter, transform=axs[i].transAxes, fontsize=7, fontweight='bold', va='top')
+        corner_letter = chr(ord(corner_letter) + 1)
+
+    plt.tight_layout()
+    plt.show()
 
 
 def plot_relevance_against_meta(relevance_df, meta_df, categories, variables, category_colours, emissions_data):
@@ -247,7 +464,6 @@ def plot_relevance_against_meta(relevance_df, meta_df, categories, variables, ca
 
     plt.show()
 
-
 # Function that takes the weights and examines simple changes in stats in weighted vs unweighted distributions
 def create_database_impact_subplots(scenario_list, scenario_titles, grouping_modes, meta_data, model_family_df,
                                     database, categories=None, category_colours=None):
@@ -280,11 +496,13 @@ def create_database_impact_subplots(scenario_list, scenario_titles, grouping_mod
 
     # set the figure size
     cm = 1/2.54  # centimeters in inches
-    fig, axs = plt.subplots(len(scenario_list), len(categories), figsize=(18*cm, 20*cm), facecolor='white')
+    fig, axs = plt.subplots(len(scenario_list), len(categories), figsize=(18*cm, 22*cm), facecolor='white')
+
+    all_results_for_csv = []
 
     for i, scenario in enumerate(scenario_list):
         scenario_title = scenario_titles[i]
-        results = read_csv(OUTPUT_DIR + 'composite_weights_' + database + '_' + scenario + '_weights.csv')
+        results = read_csv(DIVERSITY_OUTPUT_DIR + 'composite_weights_' + database + '_' + scenario + '_weights.csv')
         
         if 'Model_type' in grouping_modes:
             model_type = True
@@ -313,6 +531,7 @@ def create_database_impact_subplots(scenario_list, scenario_titles, grouping_mod
             
             ax = axs[i, j] if len(categories) > 1 else axs[i]
 
+            category_label_for_csv = str(category)
             if type(category) == list:
                 if len(category[0]) > 2:
                     category_results = results[results['Category_subset'].isin(category)]
@@ -324,7 +543,7 @@ def create_database_impact_subplots(scenario_list, scenario_titles, grouping_mod
                 if len(category) > 2:
                     category_results = results[results['Category_subset'] == category]
                 else:
-                    category_results = results[results[category_col] == category]
+                    category_results = results[results['Category'] == category]
 
             y_position = 0
             
@@ -340,6 +559,14 @@ def create_database_impact_subplots(scenario_list, scenario_titles, grouping_mod
                 scenarios_total = mode_results['Scenario_model'].sum()
                 mode_results['Weight_fraction'] = (mode_results['Weight'] / weight_total) * 100
                 mode_results['Scenarios_fraction'] = (mode_results['Scenario_model'] / scenarios_total) * 100
+
+                # Prepare data for CSV export
+                temp_df = mode_results.copy()
+                temp_df['weighting_scheme'] = scenario
+                temp_df['category'] = category_label_for_csv
+                temp_df['grouping_mode'] = mode
+                temp_df = temp_df.rename(columns={mode: 'group_item', 'Weight_fraction': 'weighted_share', 'Scenarios_fraction': 'unweighted_share'})
+                all_results_for_csv.append(temp_df[['weighting_scheme', 'category', 'grouping_mode', 'group_item', 'unweighted_share', 'weighted_share']])
 
                 # Determine the order based on the unweighted scenario fraction
                 mode_results = mode_results.sort_values('Scenarios_fraction', ascending=False)
@@ -385,7 +612,7 @@ def create_database_impact_subplots(scenario_list, scenario_titles, grouping_mod
             ax.set_xlabel('Proportion (%)')
             ax.set_title(f'{category} - {scenario_title}', fontsize=6)
             ax.set_xlim(0, 100)
-            # ax.set_ylim(-0.3125, 1.925)
+            ax.set_ylim(-0.3125, 1.925)
             ax.set_yticks([])
 
             # add figure letter at top left of ax as per nature figures
@@ -415,7 +642,12 @@ def create_database_impact_subplots(scenario_list, scenario_titles, grouping_mod
                 bbox_to_anchor=(0.5, 0.1), loc='upper center', ncol=6, frameon=False)
     plt.tight_layout(rect=[0, 0.1, 1, 1]) # Adjust layout to make space for the legend  
 
-    
+    # Export the collected results to a CSV file
+    if all_results_for_csv:
+        final_results_df = pd.concat(all_results_for_csv, ignore_index=True)
+        final_results_df.to_csv('database_impact_summary.csv', index=False)
+        print("Exported database impact summary to database_impact_summary.csv")
+
     plt.show()
 
 
@@ -813,10 +1045,10 @@ def variable_weight_subplots_composite(composite_weights_data,
     plt.rcParams['xtick.direction'] = 'in'
     plt.rcParams['ytick.major.left'] = True
     plt.rcParams['ytick.major.right'] = True
-    # plt.rcParams['ytick.minor.visible'] = True
+    plt.rcParams['ytick.minor.visible'] = True
     plt.rcParams['xtick.top'] = True
     plt.rcParams['ytick.right'] = True
-    plt.rcParams['axes.linewidth'] = 0.75
+    plt.rcParams['axes.linewidth'] = 0.5
 
     if database == 'ar6':
         if categories != None: # check whether the variable weights data has the category as metadata
@@ -826,6 +1058,7 @@ def variable_weight_subplots_composite(composite_weights_data,
                 meta_loop = meta.copy()
                 composite_weights_data = add_meta_cols(composite_weights_data, meta_loop, ['Category', 'Category_subset'])
             composite_weights_data = composite_weights_data[composite_weights_data['Category'].isin(categories)]
+            print(composite_weights_data)
     elif database == 'sci':
         if categories != None: # check whether the variable weights data has the category as metadata
             if 'Climate Assessment|Category [ID]' not in composite_weights_data.columns:
@@ -860,33 +1093,46 @@ def variable_weight_subplots_composite(composite_weights_data,
 
         variable_data = variable_data_timeseries[variable_data_timeseries['Variable']==variable]
         median_timeseries = variable_data[year_cols].median(axis=0)
-        lower_q_timeseries = variable_data[year_cols].quantile(0.25, axis=0)
-        upper_q_timeseries = variable_data[year_cols].quantile(0.75, axis=0)
+        lower_q_timeseries = variable_data[year_cols].quantile(0.25, axis=0, interpolation='higher')
+        upper_q_timeseries = variable_data[year_cols].quantile(0.75, axis=0, interpolation='higher')
+        timeseries_5 = variable_data[year_cols].quantile(0.05, axis=0, interpolation='higher')
+        timeseries_95 = variable_data[year_cols].quantile(0.95, axis=0, interpolation='higher')
 
         weighted_median = []
         weighted_lower_q = []
         weighted_upper_q = []
+        weighted_5 = []
+        weighted_95 = []
 
-        # remove nans
-        variable_data = variable_data.dropna(subset=year_cols + ['Weight'])
+        # # remove nans
+        # variable_data = variable_data.dropna(subset=year_cols + ['Weight'])
     
         for year in year_cols:
             
             # calculate the weighted median and IQR for each year
-            weighted_median.append(wquantiles.median(variable_data[year], -variable_data['Weight']))
-            weighted_lower_q.append(wquantiles.quantile(variable_data[year], -variable_data['Weight'], 0.25))
-            weighted_upper_q.append(wquantiles.quantile(variable_data[year], -variable_data['Weight'], 0.75))
-            
+            weighted_median.append(wquantiles.median(variable_data[year], variable_data['Weight']))
+            weighted_lower_q.append(wquantiles.quantile(variable_data[year], variable_data['Weight'], 0.25))
+            weighted_upper_q.append(wquantiles.quantile(variable_data[year], variable_data['Weight'], 0.75))
+            weighted_5.append(wquantiles.quantile(variable_data[year], variable_data['Weight'], 0.05))
+            weighted_95.append(wquantiles.quantile(variable_data[year], variable_data['Weight'], 0.95))
 
         weighted_median_timeseries = pd.Series(weighted_median, index=year_cols)
         weighted_lower_q_timeseries = pd.Series(weighted_lower_q, index=year_cols)
         weighted_upper_q_timeseries = pd.Series(weighted_upper_q, index=year_cols)
+        weighted_5_timeseries = pd.Series(weighted_5, index=year_cols)
+        weighted_95_timeseries = pd.Series(weighted_95, index=year_cols)
 
+        if variable == 'Carbon Sequestration|CCS':
+            print(median_timeseries)
+            print(weighted_median_timeseries)
+        
         # plot the medians
         axs[i].plot(year_cols, median_timeseries, linestyle='--', linewidth=1, alpha=1, label='Unweighted Median', color='black')
-        axs[i].plot(year_cols, weighted_median_timeseries, linestyle='dotted', linewidth=1.2, alpha=1, label='Weighted Median', color='brown')
-        axs[i].fill_between(year_cols, lower_q_timeseries, upper_q_timeseries, color='black', alpha=0.3, label='Unweighted IQR')
-        axs[i].fill_between(year_cols, weighted_lower_q_timeseries, weighted_upper_q_timeseries, color='red', alpha=0.3, label='Weighted IQR')
+        axs[i].plot(year_cols, weighted_median_timeseries, linestyle='dotted', linewidth=1.2, alpha=1, label='Weighted Median', color=CATEGORY_COLOURS_DICT[categories[0]])
+        axs[i].fill_between(year_cols, lower_q_timeseries, upper_q_timeseries, color='grey', alpha=0.3, label='Unweighted IQR')
+        axs[i].fill_between(year_cols, weighted_lower_q_timeseries, weighted_upper_q_timeseries, color=CATEGORY_COLOURS_DICT[categories[0]], alpha=0.3, label='Weighted IQR')
+        # axs[i].fill_between(year_cols, weighted_5_timeseries, weighted_95_timeseries, color='gold', alpha=0.1)
+        # axs[i].fill_between(year_cols, timeseries_5, timeseries_95, color='blue', alpha=0.1)
 
         # set the title and labels
         axs[i].set_title(variable)
@@ -908,6 +1154,127 @@ def variable_weight_subplots_composite(composite_weights_data,
         ax.set_xticklabels(year_cols, rotation=45, ha='right')
     plt.tight_layout()
     plt.show()
+
+
+
+
+
+#function that builds a set of example subplots to show how subsets of the database might change things
+def variable_weight_subplot_composite_database_subset(file_ids : list,
+                                                      category_groupings: list,
+                                                      variable: str,
+                                                      meta: pd.DataFrame,
+                                                      timeseries_data: pd.DataFrame, 
+                                                      file_dir=DIV_SENSITIVITY_OUTPUT_DIR,
+                                                      plotting_categories=['C1', 'C2']):
+
+    """
+    Function that builds a set of example subplots to show how weighting but only over smaller 
+    subsets of the database might change things.
+
+    Inputs:
+        File_ids: a list of of composite weighting files to explore
+        category groupings: a corresponding list of category groupings
+        plotting categories: the categories to show subplots of
+        file dir: the directory containing the files, default: DIV_SENSITIVITY_OUTPUT_DIR
+        plotting_categories: the categories to actually plot the data of, default C1 and C2
+
+    Outputs: 
+        Shows a plot with rows as the 'subsetted' database weighting data, with columns as the plotted categories.
+
+    """
+
+    # set up the plot params
+    plt.rcParams['xtick.minor.visible'] = True
+    plt.rcParams['ytick.direction'] = 'in'
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.major.left'] = True
+    plt.rcParams['ytick.major.right'] = True
+    plt.rcParams['ytick.minor.visible'] = True
+    plt.rcParams['xtick.top'] = True
+    plt.rcParams['ytick.right'] = True
+    plt.rcParams['axes.linewidth'] = 0.5
+
+    # set up the plot
+    fig, axs = plt.subplots(len(file_ids), len(plotting_categories), figsize=(3*len(plotting_categories), 2*len(file_ids)), facecolor='white', sharex=True, sharey=True)
+
+    # filter timeseries data to variable, categories
+    timeseries_data = timeseries_data[timeseries_data['Variable'] == variable]
+    # timeseries_data = timeseries_data[timeseries_data['Category'].isin(plotting_categories)]
+    unit = timeseries_data['Unit'].unique()
+    
+    # year cols 2020-2100, decadal
+    year_cols = [str(year) for year in range(2020, 2101, 10)]
+
+    for i, file in enumerate(file_ids):
+
+        # load in the composite weights data
+        composite_weights_data = read_csv(os.path.join(file_dir, f'composite_weights_{file}.csv'))
+
+        # join the meta cols to the composite weights data
+        composite_weights_data = add_meta_cols(composite_weights_data, meta.copy(), ['Category', 'Category_subset'])           
+
+        # join the composite weights data to timeseries data on scenario, model
+        combined_df = pd.merge(timeseries_data, composite_weights_data, on=['Scenario', 'Model'], suffixes=('', '_weight'))
+
+        # now loop the categories to be plotted
+        for j, category in enumerate(plotting_categories):
+
+            # filter the combined df for the current category
+            category_data = combined_df[combined_df['Category'] == category]
+            median_timeseries = category_data[year_cols].median(axis=0)
+            lower_q_timeseries = category_data[year_cols].quantile(0.25, axis=0, interpolation='higher')
+            upper_q_timeseries = category_data[year_cols].quantile(0.75, axis=0, interpolation='higher')
+
+
+            weighted_median = []
+            weighted_lower_q = []
+            weighted_upper_q = []
+
+
+            for year in year_cols:
+                # calculate the weighted median and IQR for each year
+                weighted_median.append(wquantiles.median(category_data[year], category_data['Weight']))
+                weighted_lower_q.append(wquantiles.quantile(category_data[year], category_data['Weight'], 0.25))
+                weighted_upper_q.append(wquantiles.quantile(category_data[year], category_data['Weight'], 0.75))
+
+
+            weighted_median_timeseries = pd.Series(weighted_median, index=year_cols)
+            weighted_lower_q_timeseries = pd.Series(weighted_lower_q, index=year_cols)
+            weighted_upper_q_timeseries = pd.Series(weighted_upper_q, index=year_cols)
+
+
+            # plot the medians
+            axs[i,j].plot(year_cols, median_timeseries, linestyle='--', linewidth=1, alpha=1, label='Unweighted Median', color='black')
+            axs[i,j].plot(year_cols, weighted_median_timeseries, linestyle='dotted', linewidth=1.2, alpha=1, label='Weighted Median', color=CATEGORY_COLOURS_DICT[category])
+            axs[i,j].fill_between(year_cols, lower_q_timeseries, upper_q_timeseries, color='grey', alpha=0.3, label='Unweighted IQR')
+            axs[i,j].fill_between(year_cols, weighted_lower_q_timeseries, weighted_upper_q_timeseries, color=CATEGORY_COLOURS_DICT[category], alpha=0.3, label='Weighted IQR')
+
+            # set the title and labels
+            axs[i,j].set_title(category)
+            axs[i,j].set_ylabel(unit)
+            axs[i,j].set_xlabel('Year')
+
+            # # add a, b, c, d labels to the subplots
+            # axs[i,j].text(-0.22, 1.17, chr(97 + i), transform=axs[i,j].transAxes, 
+            #             fontsize=6.5, fontweight='bold', va='top', ha='left')
+
+            # if i == 4:
+            #     # add a legend to the second subplot
+            #     axs[i].legend(loc='upper left', frameon=False)
+
+        # # set the x-axis limits
+        # for ax in axs:  
+        #     ax.set_xlim(0, 8)
+        #     ax.set_xticks(year_cols)
+        #     ax.set_xticklabels(year_cols, rotation=45, ha='right')
+        
+    plt.tight_layout()
+    plt.show()
+
+
+
+
 
 
 # Function that takes the variable weights individually, and applies them to each of the variables
@@ -1037,7 +1404,7 @@ def variable_weight_subplots(variable_weights_data, timeseries_data, variables, 
 def variable_weight_subplots_sigma_sensitivity(sigmas, 
                                                 timeseries_data, 
                                                 variables, database, categories=None, 
-                                                meta=None):
+                                                meta=None, sigma_others=None):
     """
     Function that creates subplots for each variable showing a median line for the
     unweighted variable and median lines for each sigma sensitivity test.
@@ -1074,17 +1441,30 @@ def variable_weight_subplots_sigma_sensitivity(sigmas,
     
     # colour map gnbu gradient
     cmap = plt.get_cmap('cool')
+    cmap2 = plt.get_cmap('viridis')
 
-    sigmas = [float(sigma) for sigma in sigmas]
+    sigmas_float = [float(sigma) for sigma in sigmas]
+    total_sigma_list = sigma_others + sigmas
+    other_sigmas_floats = []
 
-    for sigma in sigmas:
 
-        print(f"Processing sigma: {sigma}")
+    for sigma in total_sigma_list:
 
-        sigma_colour = cmap(sigma / max(sigmas))  # Get a color from the colormap based on the sigma value
-        
+        if sigma_others is not None:
+
+            # check if sigma in sigma_others
+            if sigma in sigma_others:
+                sigma_number = sigma[-1]
+                sigma_colour = cmap2(float(sigma_number)/ 6)  # Get a color from the colormap based on the sigma value
+                other_sigmas_floats.append(float(sigma_number))
+            else:
+                sigma_colour = cmap(float(sigma) / max(sigmas_float))  # Get a color from the colormap based on the sigma value
+
+        else:
+            sigma_colour = cmap(float(sigma) / max(sigmas_float))  # Get a color from the colormap based on the sigma value
+
         # ensure sigma is 2 decimal places as string
-        sigma = f"{sigma:.2f}"
+        # sigma = f"{sigma:.2f}"
         variable_weights_data = read_csv(OUTPUT_DIR + f"variable_weights_{database}_{sigma}_sigma.csv")
 
         if database == 'ar6':
@@ -1119,6 +1499,7 @@ def variable_weight_subplots_sigma_sensitivity(sigmas,
         )
 
         variable_data_timeseries['Weight'] = -variable_data_timeseries['Weight']
+        
         if min(variable_data_timeseries['Weight']) < 0:
             # If the minimum weight is negative, we need to shift the weights to make them all positive
             variable_data_timeseries['Weight'] = variable_data_timeseries['Weight'] - np.min(variable_data_timeseries['Weight'])
@@ -1191,6 +1572,15 @@ def variable_weight_subplots_sigma_sensitivity(sigmas,
     cbar = plt.colorbar(sm, ax=axs, orientation='horizontal', fraction=0.02, pad=0.2)  # cbar.set_label('Sigma Value', rotation=0, labelpad=-40, y=1.05, ha='right')
     cbar.ax.xaxis.set_ticks_position('top')
     cbar.ax.xaxis.set_label_position('top')
+
+    if sigma_others is not None:
+        # add second colour bar
+        norm2 = plt.Normalize(vmin=min(other_sigmas_floats), vmax=max(other_sigmas_floats))
+        sm2 = plt.cm.ScalarMappable(cmap=cmap2, norm=norm2)
+        cbar2 = plt.colorbar(sm2, ax=axs, orientation='horizontal', fraction=0.02, pad=0.2)
+        cbar2.ax.xaxis.set_ticks_position('top')
+        cbar2.ax.xaxis.set_label_position('top')
+
     plt.show()
 
 
@@ -1270,13 +1660,13 @@ def boxplots_quality_weighting(quality_weights, timeseries_emissions, meta_data,
     plt.rcParams['ytick.major.left'] = True
     plt.rcParams['ytick.major.right'] = True
     plt.rcParams['ytick.minor.visible'] = True
-    plt.rcParams['xtick.top'] = True
+    # plt.rcParams['xtick.top'] = True
     plt.rcParams['ytick.right'] = True
-    plt.rcParams['axes.linewidth'] = 0.75
+    plt.rcParams['axes.linewidth'] = 0.5
 
 
     # set up figure with width 180mm and height of 100mm 
-    fig, axs = plt.subplots(1, len(test_variables), figsize=(6*len(test_variables), 7.08), facecolor='white')
+    fig, axs = plt.subplots(1, len(test_variables), figsize=(4, 3), facecolor='white')
 
     for i, variable in enumerate(test_variables):
 
@@ -1296,20 +1686,24 @@ def boxplots_quality_weighting(quality_weights, timeseries_emissions, meta_data,
 
         # join the quality weights to the variable data
         variable_data = pd.merge(quality_weights, variable_data, on=['Model', 'Scenario'], how='inner')
+        print(variable_data)
 
         # ensure the variable data has the category as a column
         if 'Category' not in variable_data.columns:
-            if 'Category' not in quality_input_df.columns:
-                raise ValueError("Category column not found in variable_data or quality_input_df.")
-            variable_data = add_meta_cols(variable_data, meta_data, ['Category'])
+            if 'Category' not in quality_weights.columns:
+                # raise ValueError("Category column not found in variable_data or quality_weights.")
+                variable_data = add_meta_cols(variable_data, meta_data.copy(), ['Category'])
         
         tick_positions = []
         x_position = 0
         for category in categories:
 
-            # filter out the data for the category
-            category_data = variable_data[variable_data['Category'] == category]
-            # print(category_data)
+            
+            if len(category) >2:
+                category_data = variable_data[variable_data['Category_subset'] == category]
+            else:
+                category_data = variable_data[variable_data['Category'] == category]
+
             
             if year == None:
                 print('year is none')
@@ -1318,31 +1712,62 @@ def boxplots_quality_weighting(quality_weights, timeseries_emissions, meta_data,
 
             else:
                 year_data = category_data[year]
-
+                # year_data = year_data/1000
             # create a weighted version of the data
             weighted_year_data = [wquantiles.quantile(year_data, category_data['Weight'], q) for q in np.linspace(0, 1, len(year_data))]
 
-            # plot matplotlib boxplot
-            axs[i].boxplot(year_data, positions=[x_position], widths=0.3, 
-                        meanline=True, showmeans=True, showfliers=False, patch_artist=True, 
-                        boxprops=dict(facecolor=CB_CAT_COLORS[category], edgecolor='white', linewidth=0.5), 
-                        meanprops=dict(color='black', linewidth=.75), medianprops=dict(color='black'),
-                        whiskerprops=dict(color='black', linewidth=0.5), capprops=dict(color='black', linewidth=0.5))
+            # normal stats
+            median = np.median(year_data)
+            q1 = np.percentile(year_data, 25, method='inverted_cdf')
+            q3 = np.percentile(year_data, 75, method='inverted_cdf')
+            pcrt_5 = np.percentile(year_data, 5, method='inverted_cdf')
+            pcrt_95 = np.percentile(year_data, 95, method='inverted_cdf')
+
+            # weighted stats
+            weighted_median = wquantiles.median(year_data, category_data['Weight'])
+            weighted_q1 = wquantiles.quantile(year_data, category_data['Weight'], 0.25)
+            weighted_q3 = wquantiles.quantile(year_data, category_data['Weight'], 0.75)
+            weighted_pcrt_5 = wquantiles.quantile(year_data, category_data['Weight'], 0.05)
+            weighted_pcrt_95 = wquantiles.quantile(year_data, category_data['Weight'], 0.95)
+
+            # # plot the normal data
+            # axs[i].plot([median, median], [x_position - 0.15, x_position + 0.15], color=CATEGORY_COLOURS_DICT[category], linewidth=1)  
             
-            axs[i].boxplot(weighted_year_data, positions=[x_position+0.35], widths=0.3, 
-                        meanline=True, showmeans=True, showfliers=False, patch_artist=True, 
-                        boxprops=dict(facecolor=CB_CAT_COLORS[category], edgecolor='white', linewidth=0.5, alpha=0.5), meanprops=dict(color='black', linewidth=.75), medianprops=dict(color='black'),
-                        whiskerprops=dict(color='black', linewidth=0.5), capprops=dict(color='black', linewidth=0.5))
+            # Plot the median
+            axs[i].plot([x_position - 0.15, x_position + 0.15], [median, median], 
+                        color=CATEGORY_COLOURS_DICT[category], linewidth=1, alpha=0.75)
+            axs[i].plot([x_position + 0.35 - 0.15, x_position + 0.35 + 0.15], [weighted_median, weighted_median], color=CATEGORY_COLOURS_DICT[category], linewidth=1, alpha=0.75)
+
+            # plot the weighted data
+            axs[i].fill_betweenx(x1=(x_position+0.35) - 0.15, x2=(x_position+0.35) + 0.15, y=(weighted_q1, weighted_q3), color=CATEGORY_COLOURS_DICT[category], alpha=0.45)
+            axs[i].fill_betweenx(x1=(x_position+0.35) - 0.15, x2=(x_position+0.35) + 0.15, y=(weighted_pcrt_5, weighted_pcrt_95), color=CATEGORY_COLOURS_DICT[category], alpha=0.4, edgecolor=None)
+
+            axs[i].fill_betweenx(x1=x_position - 0.15, x2=x_position + 0.15, y=(q1, q3), color=CATEGORY_COLOURS_DICT[category], alpha=0.3)
+            axs[i].fill_betweenx(x1=x_position - 0.15, x2=x_position + 0.15, y=(pcrt_5, pcrt_95), color=CATEGORY_COLOURS_DICT[category], alpha=0.15, edgecolor=None)
+
+            # # plot matplotlib boxplot
+            # axs[i].boxplot(year_data, positions=[x_position], widths=0.3, 
+            #             meanline=True, showmeans=True, showfliers=False, patch_artist=True, 
+            #             boxprops=dict(facecolor=CB_CAT_COLORS[category], edgecolor='white', linewidth=0.5), 
+            #             meanprops=dict(color='black', linewidth=.75), medianprops=dict(color='black'),
+            #             whiskerprops=dict(color='black', linewidth=0.5), capprops=dict(color='black', linewidth=0.5))
             
+            # axs[i].boxplot(weighted_year_data, positions=[x_position+0.35], widths=0.3, 
+            #             meanline=True, showmeans=True, showfliers=False, patch_artist=True, 
+            #             boxprops=dict(facecolor=CB_CAT_COLORS[category], edgecolor='white', linewidth=0.5, alpha=0.5), meanprops=dict(color='black', linewidth=.75), medianprops=dict(color='black'),
+            #             whiskerprops=dict(color='black', linewidth=0.5), capprops=dict(color='black', linewidth=0.5))
+            
+
             tick_positions.append(x_position + 0.175)
             x_position += 1
 
         axs[i].set_xticks(tick_positions)
         axs[i].set_xticklabels(categories)
 
-    # set the y axis label
-    # axs.set_ylabel('Investment in energy supply as a share of GDP (%) (2020-2100)')
 
+    for ax in axs.flatten():
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['top'].set_visible(False)
     # plt.tight_layout()
     plt.show()
 
@@ -1424,7 +1849,6 @@ def boxplots_sci_weighting(composite_weights, variable_data,
 
     # plt.tight_layout()
     plt.show()
-
 
 
 # Function that plots a histogram of the quality weights for each mode, stacked by category
@@ -1516,7 +1940,6 @@ def quality_diversity_weights(quality_weights, diversity_weights, indicator_mode
     plt.ylim(0, max(combined_df['Weight_quality'])) 
 
     plt.show()
-
 
 
 def histogram_weighting(df_results, plot_mode='Diversity', indicator=['Temperature'], meta_data=None):
@@ -1650,7 +2073,7 @@ def violin_plots(df_results, categories, save_fig=None):
         elif category == 'C1' or 'C2':
             data = df_results.loc[df_results['Category']==category]
         weighted_distribution = weighted_quantiles = [wquantiles.quantile(data['Net zero GHG year_harmonised'], data['Weight'], q) for q in np.linspace(0, 1, len(data))]
-        unweighted_distribution = data['Net zero GHG year_harmonised'].values
+        unweighted_distribution = [wquantiles.quantile(data['Net zero GHG year_harmonised'],np.ones(len(data)),q) for q in np.linspace(0, 1, len(data))]
         # unweighted_distribution = pd.DataFrame(unweighted_distribution, columns=['Net zero GHG year_harmonised'])
         unweighted_distribution = pd.DataFrame(unweighted_distribution, columns=['Net zero CO2 year_harmonised'])
         unweighted_distribution['Weighted'] = 0
@@ -1731,12 +2154,12 @@ def violin_plots(df_results, categories, save_fig=None):
 
         delta = 0.2
         # add 5th and 95th percentile lines in gray at the point on the y axis, .2 either side of count
-        lower_5th = data['Net zero CO2 year_harmonised'].quantile(0.05)
-        upper_95th = data['Net zero CO2 year_harmonised'].quantile(0.95)
+        lower_5th = data['Net zero CO2 year_harmonised'].quantile(0.05, interpolation='higher')
+        upper_95th = data['Net zero CO2 year_harmonised'].quantile(0.95, interpolation='higher')
         lower_5th_weighted = wquantiles.quantile(data['Net zero CO2 year_harmonised'], data['Weight'], 0.05)
         upper_95th_weighted = wquantiles.quantile(data['Net zero CO2 year_harmonised'], data['Weight'], 0.95)
-        upper_5th_ghgs = data['Net zero GHG year_harmonised'].quantile(0.05)
-        lower_95th_ghgs = data['Net zero GHG year_harmonised'].quantile(0.95)
+        upper_5th_ghgs = data['Net zero GHG year_harmonised'].quantile(0.05, interpolation='higher')
+        lower_95th_ghgs = data['Net zero GHG year_harmonised'].quantile(0.95, interpolation='higher')
         upper_5th_ghgs_weighted = wquantiles.quantile(data['Net zero GHG year_harmonised'], data['Weight'], 0.05)
         lower_95th_ghgs_weighted = wquantiles.quantile(data['Net zero GHG year_harmonised'], data['Weight'], 0.95)
         ax1.vlines(lower_5th, count_scatter_1 - delta, count_scatter_1, colors='gray', linestyles='--', linewidth=1)
@@ -2176,6 +2599,204 @@ def jackknife_stick_plots_category_side(jackknife_results, modes, categories, va
     plt.tight_layout()
     plt.show()  
 
+
+
+def plot_dendrogram_with_threshold(corr_matrix, method='average'):
+    
+    from scipy.cluster.hierarchy import linkage, dendrogram
+    from scipy.spatial.distance import squareform
+    
+    distance_matrix = 1 - corr_matrix.abs()
+    condensed_distances = squareform(distance_matrix)
+    linkage_matrix = linkage(condensed_distances, method=method)
+
+    
+    plt.figure(figsize=(8, 6))
+    dendrogram(linkage_matrix, labels=corr_matrix.columns, orientation='top', leaf_rotation=45)
+    plt.axhline(y=0.4, color='red', linestyle='--', label='Threshold=0.4')
+    plt.axhline(y=0.5, color='orange', linestyle='--', label='Threshold=0.5')
+    plt.xlabel('Distance')
+    plt.title('Hierarchical Clustering Dendrogram')
+    plt.legend()
+    plt.show()
+
+
+
+
+def plot_diversity_weight_impact(
+    df: pd.DataFrame,
+    weight_col: str,                  # e.g. "diversity_weight" (higher = better)
+    left_rank_by_col: str,            # e.g. "peak_warming"
+    right_rank_by_col: str,           # e.g. "cumulative_emissions"
+    left_group_col: str,              # e.g. "model_framework"
+    right_group_col: str,             # e.g. "policy_category"
+    scenario_col: str = "scenario",
+    ascending_left: bool = True,      # True => lower value ranks better on LEFT
+    ascending_right: bool = True,     # True => lower value ranks better on RIGHT
+    subselect: pd.Series | None = None,
+    left_color_map: dict | None = None,
+    right_color_map: dict | None = None,
+    line_alpha: float = 0.55,
+    line_alpha_highlight: float = 0.85,
+    line_lw: float = 0.8,
+    line_lw_highlight: float = 0.8,
+    point_radius: float = 0.12,       # radius for centre dots in Y (rank) units
+    faint_endpoint_size: float = 10,  # small endpoints at left/right
+    figsize=(110 / 25.4, 90 / 25.4),
+    titles: tuple[str, str, str] | None = None,
+    highlight_scenarios: list[str] | None = None,
+    ): 
+    
+    """
+    Builds a three-column rank-shift plot:
+      [Left]   rank by `left_rank_by_col`  (coloured by `left_group_col`)
+      [Middle] rank by `weight_col` (descending: higher weight = rank 1)
+      [Right]  rank by `right_rank_by_col` (coloured by `right_group_col`)
+
+    Requirements:
+      df must contain: scenario_col, weight_col, left_rank_by_col, right_rank_by_col,
+                       left_group_col, right_group_col.
+
+    Returns:
+      fig, ranked_df  (ranked_df includes y_left / y_mid / y_right and groups)
+    """
+    # --------- Validate & subset ----------
+    need = {scenario_col, weight_col, left_rank_by_col, right_rank_by_col, left_group_col, right_group_col}
+    missing = [c for c in need if c not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns: {missing}")
+
+    data = df.copy()
+    if subselect is not None:
+        data = data.loc[subselect].copy()
+
+    data = data.dropna(subset=list(need)).copy()
+
+    # --------- Ranks (robust to ties via method='first') ----------
+    # Calculate group sizes
+    data['left_group_size'] = data.groupby(left_group_col)[left_group_col].transform('count')
+    data['right_group_size'] = data.groupby(right_group_col)[right_group_col].transform('count')
+
+    # Sort by group size (ascending) then by the rank-by column, then assign rank
+    data = data.sort_values(by=['left_group_size', left_rank_by_col], ascending=[True, ascending_left])
+    data["rank_left"] = range(1, len(data) + 1)
+
+    data = data.sort_values(by=['right_group_size', right_rank_by_col], ascending=[True, ascending_right])
+    data["rank_right"] = range(1, len(data) + 1)
+
+    data["rank_mid"]   = data[weight_col].rank(method="first", ascending=False).astype(int)  # higher weight = better
+
+    # Stable sort for nicer layering (draw higher ranks later)
+    data.sort_values(["rank_mid", "rank_left", "rank_right"], inplace=True)
+
+    # --------- Colour maps ----------
+    def build_colour_map(values):
+        vals = pd.Index(values.astype(str).unique())
+        cycle = plt.rcParams["axes.prop_cycle"].by_key().get("color", [])
+        if not cycle:
+            cycle = [f"C{i}" for i in range(10)]
+        return {v: cycle[i % len(cycle)] for i, v in enumerate(vals)}
+
+    cmap_left = left_color_map
+    if cmap_left is None:
+        cmap_left  = build_colour_map(data[left_group_col].astype(str))
+
+    cmap_right = right_color_map
+    if cmap_right is None:
+        cmap_right = build_colour_map(data[right_group_col].astype(str))
+
+
+    # --------- Geometry ----------
+    x_left, x_mid, x_right = 0.0, 1.0, 2.0
+    y_left  = data["rank_left"].to_numpy()
+    y_mid   = data["rank_mid"].to_numpy()
+    y_right = data["rank_right"].to_numpy()
+
+    # --------- Plot scaffold ----------
+    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+
+    # Rounded cubic Bézier connector
+    def draw_curve(x0, y0, x1, y1, color, lw, alpha):
+        dx = x1 - x0
+        c1 = (x0 + 0.35*dx, y0)
+        c2 = (x1 - 0.35*dx, y1)
+        verts = [(x0, y0), c1, c2, (x1, y1)]
+        codes = [Path.MOVETO, Path.CURVE4, Path.CURVE4, Path.CURVE4]
+        path = Path(verts, codes)
+        ax.add_patch(PathPatch(path, facecolor="none", edgecolor=color, lw=lw, alpha=alpha, zorder=1))
+
+    # Helper: half-and-half centre dot
+    def draw_half_dot(x, y, r, color_left, color_right, edge_color="none", edge_lw=0.6, z=3):
+        ax.add_patch(Wedge((x, y), r, 90, 270, facecolor=color_left, edgecolor="none", zorder=z))
+        ax.add_patch(Wedge((x, y), r, -90, 90, facecolor=color_right, edgecolor="none", zorder=z))
+        ax.add_patch(Circle((x, y), r, facecolor="none", edgecolor=edge_color, lw=edge_lw, zorder=z))
+
+    # --------- Draw lines & points ----------
+    # hi = set(map(str, highlight_scenarios)) if highlight_scenarios else set()
+
+    # hi = top 10 and bottom 10 scenarios in the mid rank
+    hi = set(data.nsmallest(10, "rank_mid")[scenario_col].astype(str))
+    hi.update(set(data.nlargest(10, "rank_mid")[scenario_col].astype(str)))
+
+    for _, row in data.iterrows():
+        yl, ym, yr = row["rank_left"], row["rank_mid"], row["rank_right"]
+        col_l = cmap_left[str(row[left_group_col])]
+        col_r = cmap_right[str(row[right_group_col])]
+        is_hi = str(row[scenario_col]) in hi
+
+        # left -> middle (left colour)
+        draw_curve(x_left, yl, x_mid, ym, color=col_l,
+                   alpha=line_alpha_highlight if is_hi else line_alpha,
+                   lw=line_lw_highlight if is_hi else line_lw)
+
+        # middle -> right (right colour)
+        draw_curve(x_mid, ym, x_right, yr, color=col_r,
+                   alpha=line_alpha_highlight if is_hi else line_alpha,
+                   lw=line_lw_highlight if is_hi else line_lw)
+
+        # faint endpoints (left/right)
+        ax.scatter([x_left, x_right], [yl, yr], s=faint_endpoint_size, c=["#888888", "#888888"], alpha=0.5, zorder=2)
+
+        # centre split dot
+        # draw_half_dot(x_mid, ym, point_radius, color_left=col_l, color_right=col_r)
+
+    # --------- Axes cosmetics ----------
+    max_rank = int(max(data["rank_left"].max(), data["rank_mid"].max(), data["rank_right"].max()))
+    ax.set_xlim(-0.1, 2.1)
+    ax.set_ylim(max_rank + 1, 0)  # rank 1 at top
+    if titles is None:
+        titles = (
+            f"Rank by {left_rank_by_col}",
+            f"Rank by {weight_col}",
+            f"Rank by {right_rank_by_col}",
+        )
+    ax.set_xticks([x_left, x_mid, x_right], labels=titles)
+    ax.set_ylabel("Rank (1 = top)")
+    ax.grid(axis="y", linestyle=":", alpha=0.25)
+    for spine in ["top", "right", "left", "bottom"]:
+        ax.spines[spine].set_visible(False)
+
+    # add a vertical axis line at the mid rank point
+    ax.axvline(x=x_mid, color="black", linewidth=0.8, alpha=0.5)
+
+    # Legends (two separate)
+    lh = [Line2D([0],[0], color=cmap_left[g], lw=3, label=str(g))  for g in cmap_left]
+    rh = [Line2D([0],[0], color=cmap_right[g], lw=3, label=str(g)) for g in cmap_right]
+    leg1 = ax.legend(handles=lh, title=left_group_col, frameon=False, fontsize=6, title_fontsize=6,
+                     loc="upper center", bbox_to_anchor=(0.33, -0.05), ncol=min(4, len(lh)))
+    ax.add_artist(leg1)
+    ax.legend(handles=rh, title=right_group_col, frameon=False, fontsize=6, title_fontsize=6,
+              loc="upper center", bbox_to_anchor=(0.75, -0.05), ncol=min(4, len(rh)))
+
+    # --------- Output ----------
+    ranked_df = data[[scenario_col, left_group_col, right_group_col,
+                      left_rank_by_col, right_rank_by_col, weight_col,
+                      "rank_left", "rank_mid", "rank_right"]].copy()
+
+    fig.suptitle("Impact of Diversity Weighting on Scenario Ranking", y=1.02)
+    plt.show()
+    print(ranked_df)
+    # return fig, {"top": top_tbl, "bottom": bottom_tbl, "all": data}
 
 
 # # Function that plots weighted and unweighted histograms of variable data

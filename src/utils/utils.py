@@ -56,7 +56,7 @@ def data_download_sub(variables, models, scenarios, categories, region, end_year
         # # if Carbon Sequestration|CCS in variables, replace with Carbon Capture
         # if 'Carbon Sequestration|CCS' in variables:
         #     variables = [var.replace('Carbon Sequestration|CCS', 'Carbon Capture') for var in variables]
-        
+        print(pyam.iiasa.Connection().valid_connections)
         df = pyam.read_ixmp4(
                             platform,
                             model=models,  

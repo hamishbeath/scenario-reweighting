@@ -5,14 +5,13 @@ This file contains all the constant values used throughout the project.
 """
 import numpy as np
 
-# General Configurations
-APP_NAME = "IAMEE"
-VERSION = "0.0b"
 
 # # File Paths
 # DATA_DIR = "data/"
 OUTPUT_DIR = "outputs/"
 INPUT_DIR = "inputs/"
+DIVERSITY_OUTPUT_DIR = OUTPUT_DIR + "diversity_weights/"
+DIV_SENSITIVITY_OUTPUT_DIR = DIVERSITY_OUTPUT_DIR + "sensitivity/"
 # PROCESSED_DIR = DATA_DIR + "processed/"
 # DATABASE_DIR = "database/"
 # LOG_FILE = "logs/app.log"
@@ -255,7 +254,83 @@ VARIABLE_INFO_SCI = {
     }
 }
 
-
+VARIABLE_INFO_EMISSIONS_ONLY = {
+    'Emissions|CH4': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 1/6
+    },
+    'Emissions|CO2': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 1/2
+    },
+    'Emissions|N2O': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 1/6
+    },
+    'Emissions|Sulfur': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 1/6
+    },
+    'Primary Energy|Biomass': {
+        'group': 'Energy',
+        'group_weight': 0,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Coal': {
+        'group': 'Energy',
+        'group_weight': 0,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Gas': {
+        'group': 'Energy',
+        'group_weight': 0,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Non-Biomass Renewables': {
+        'group': 'Energy',
+        'group_weight': 0,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Nuclear': {
+        'group': 'Energy',
+        'group_weight': 0,
+        'subgroup_weight': 1/12
+    },
+    'Primary Energy|Oil': {
+        'group': 'Energy',
+        'group_weight': 0,
+        'subgroup_weight': 1/12
+    },
+    'Final Energy': {
+        'group': 'Energy',
+        'group_weight': 0,
+        'subgroup_weight': 1/2
+    },
+    'Consumption': {
+        'group': 'Economy',
+        'group_weight': 0,
+        'subgroup_weight': 1/2
+    },
+    'GDP|PPP': {
+        'group': 'Economy',
+        'group_weight': 0,
+        'subgroup_weight': 1/2
+    },
+    'Carbon Sequestration|CCS': {
+        'group': 'Mitigation',
+        'group_weight': 0,
+        'subgroup_weight': 1/2
+    },
+    'Price|Carbon': {
+        'group': 'Mitigation',
+        'group_weight': 0,
+        'subgroup_weight': 1/2
+    }
+}
 
 VARIABLE_INFO_ENERGY = {
     'Emissions|CH4': {
@@ -310,7 +385,7 @@ VARIABLE_INFO_ENERGY = {
     },
     'Final Energy': {
         'group': 'Energy',
-        'group_weight': 1/4,
+        'group_weight': 1,
         'subgroup_weight': 1/2
     },
     'Consumption': {
@@ -335,6 +410,83 @@ VARIABLE_INFO_ENERGY = {
     }
 }
 
+CORREL_ADJUSTED_WEIGHTS_FLAT_HC = {
+    'Emissions|CH4': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Emissions|CO2': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Emissions|N2O': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Emissions|Sulfur': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Primary Energy|Biomass': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Primary Energy|Coal': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Primary Energy|Gas': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Primary Energy|Non-Biomass Renewables': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Primary Energy|Nuclear': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Primary Energy|Oil': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Final Energy': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Consumption': {
+        'group': 'Economy',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'GDP|PPP': {
+        'group': 'Economy',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Carbon Sequestration|CCS': {
+        'group': 'Mitigation',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Price|Carbon': {
+        'group': 'Mitigation',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    }
+}
 
 
 VARIABLE_INFO_NO_EMISSIONS = {
@@ -460,7 +612,7 @@ MODES_COLOURMAPS = {
         'Kikstra 2021': '#9a6324', 'Strefler 2018': '#fffac8', 'Strefler 2021a': '#800000',
         'Schultes 2021': '#aaffc3', 'Baumstark 2021': '#808000', 'Kriegler 2018': '#ffd8b1',
         'Bertram 2018': '#000075', 'Strefler 2021b': '#808080', 'Soergel 2021': '#ffffff',
-        'Luderer 2021': '#000000', 'Other': "#7f7f7f", 'Guo 2021': '#c0c0c0'
+        'Luderer 2021': '#000000', 'Other': "#7f7f7f", 'Guo 2021': '#c0c0c0', 'Levesque 2021': '#ffbb78'
     },
     'Model_type': {
         'IT_GE': '#d2f53c', 'IT_PE': '#fabea4', 'RD_CGE': '#6a3d9a',
@@ -516,100 +668,8 @@ MODES_COLOURMAPS = {
 }
 
 
-CORREL_ADJUSTED_WEIGHTS_FLAT_HC = {
-    'Emissions|CH4': {
-        'group': 'Emissions',
-        'group_weight': 1,
-        'subgroup_weight': 0
-    },
-    'Emissions|CO2': {
-        'group': 'Emissions',
-        'group_weight': 1,
-        'subgroup_weight': 0.125
-    },
-    'Emissions|N2O': {
-        'group': 'Emissions',
-        'group_weight': 1,
-        'subgroup_weight': 0.125
-    },
-    'Emissions|Sulfur': {
-        'group': 'Emissions',
-        'group_weight': 1,
-        'subgroup_weight': 0
-    },
-    'Primary Energy|Biomass': {
-        'group': 'Energy',
-        'group_weight': 1,
-        'subgroup_weight': 0
-    },
-    'Primary Energy|Coal': {
-        'group': 'Energy',
-        'group_weight': 1,
-        'subgroup_weight': 0
-    },
-    'Primary Energy|Gas': {
-        'group': 'Energy',
-        'group_weight': 1,
-        'subgroup_weight': 0
-    },
-    'Primary Energy|Non-Biomass Renewables': {
-        'group': 'Energy',
-        'group_weight': 1,
-        'subgroup_weight': 0.125
-    },
-    'Primary Energy|Nuclear': {
-        'group': 'Energy',
-        'group_weight': 1,
-        'subgroup_weight': 0.125
-    },
-    'Primary Energy|Oil': {
-        'group': 'Energy',
-        'group_weight': 1,
-        'subgroup_weight': 0
-    },
-    'Final Energy': {
-        'group': 'Energy',
-        'group_weight': 1,
-        'subgroup_weight': 0
-    },
-    'Consumption': {
-        'group': 'Economy',
-        'group_weight': 1,
-        'subgroup_weight': 0.125
-    },
-    'GDP|PPP': {
-        'group': 'Economy',
-        'group_weight': 1,
-        'subgroup_weight': 0.125
-    },
-    'Carbon Sequestration|CCS': {
-        'group': 'Mitigation',
-        'group_weight': 1,
-        'subgroup_weight': 0.125
-    },
-    'Price|Carbon': {
-        'group': 'Mitigation',
-        'group_weight': 1,
-        'subgroup_weight': 0.125
-    }
-}
 
-# CORREL_ADJUSTED_WEIGHTS_FLAT = {'Carbon Sequestration|CCS': 0, 
-#                            'Consumption': 0, 
-#                            'Emissions|CH4': 0, 
-#                            'Emissions|CO2': 0, 
-#                            'Emissions|N2O': 0, 
-#                            'Emissions|Sulfur': 0, 
-#                            'Final Energy': 0, 
-#                            'GDP|PPP': 0, 
-#                            'Price|Carbon': 0, 
-#                            'Primary Energy|Biomass': 0, 
-#                            'Primary Energy|Coal': 0, 
-#                            'Primary Energy|Gas': 0, 
-#                            'Primary Energy|Non-Biomass Renewables': 0, 
-#                            'Primary Energy|Nuclear': 1, 
-#                            'Primary Energy|Oil': 0
-# }
+    
 
 
 # SSP Scenarios

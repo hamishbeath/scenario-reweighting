@@ -25,7 +25,10 @@ def main():
     Run the sigma calculation for the AR6 pathways.
     """
     
-    # ar6_tier_0_data = read_csv(INPUT_DIR + 'ar6_pathways_tier0.csv')
+    ar6_tier_0_data = read_csv(INPUT_DIR + 'ar6_pathways_tier0.csv')
+    
+
+
     # sigma_values = calculate_sigma_SSP_RCP(ar6_tier_0_data, SSP_SCENARIOS, TIER_0_VARIABLES)
     # sigma_values.to_csv(OUTPUT_DIR + 'sigma_value_0.00_1.00.csv', index=False)
     
@@ -37,33 +40,42 @@ def main():
     """
     Run the variable weights calculation 
     """
-    # pairwise_rms_sci = read_csv(OUTPUT_DIR + 'pairwise_rms_distances_sci.csv')
+    # pairwise_rms_ar6 = read_csv(OUTPUT_DIR + 'pairwise_rms_distances_ar6.csv')
     # sigma_values = read_csv(OUTPUT_DIR + 'sigma_value_ar6.csv')
     # sigma_values = sigma_values.set_index('Variable')
-    # calculate_range_variable_weights(pairwise_rms_sci, sigma_values, 'sci', variables=TIER_0_VARIABLES_SCI)
 
-    sigmas = ['0.0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0']
-    # determine_sigma_greatest_diversity('sci', sigmas, TIER_0_VARIABLES_SCI)    
-    #     sigma_variables = sigmas_values[sigma_string].to_dict()
-    #     print(sigma_variables)
-    #     calculate_variable_weights(pairwise_rms, sigma_variables, 'ar6', sigma_string + '_sigma', return_df=True)
-    #     print(f"Variable weights calculated for sigma {sigma_string}")
+    # sigmas = ['log_below_1', 'log_below_2', 'log_below_3', 'log_below_4', 'log_below_5', 'log_below_6', 'min', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', 'max']
+    # determine_sigma_greatest_diversity('ar6', sigmas, TIER_0_VARIABLES)    
+    # #     print(f"Variable weights calculated for sigma {sigma_string}")
+    # calculate_range_variable_weights(pairwise_rms_ar6, sigma_values, 'ar6', variables=TIER_0_VARIABLES, sigmas=sigmas)
 
-#     sigma_value = sigma_values.set_index('Variable')[sigma_string].to_dict()
-    # scenario_variable_weights = calculate_variable_weights(pairwise_rms, sigma_value, 'ar6', sigma_string + '_sigma', return_df=False)
+
     """
     Composite weights calculation for the AR6 pathways.
 
     """
-    sigma_string = '0.5'
-    database = 'sci'
-    sci_timeseries_data = read_csv(INPUT_DIR + 'sci_pathways.csv')
-    scenario_variable_weights = read_csv(OUTPUT_DIR + f'variable_weights_{database}_{sigma_string}_sigma.csv')
-    calculate_composite_weight(scenario_variable_weights, sci_timeseries_data, 
-                               database + '_' + sigma_string + '_sigma_expert_weights', VARIABLE_INFO_SCI, flat_weights=None)
+    # sigmas = ['log_below_4', 'min', '0.2', '0.5', 'max']
+    # database = 'ar6'
+    # # for sigma in sigmas:
+    #     scenario_variable_weights = read_csv(OUTPUT_DIR + f'variable_weights_{database}_{sigma}_sigma.csv')
+    #     calculate_composite_weight(scenario_variable_weights, ar6_tier_0_data, 
+    #                             database + '_' + sigma + '_sigma_emissions_only_weights', VARIABLE_INFO_EMISSIONS_ONLY)
 
-    # meta = read_csv(INPUT_DIR + 'ar6_meta_data.csv')
-    # variable_data = add_meta_cols(ar6_tier_0_data, meta, metacols=['Category'])
+    meta = read_csv(INPUT_DIR + 'ar6_meta_data.csv')
+    variable_data = add_meta_cols(ar6_tier_0_data, meta, metacols=['Category'])
+    variable_data = variable_data[variable_data['Category']=='C1']  # filter to only emissions variables
+    variable_data = variable_data[variable_data['Variable']=='Price|Carbon']  # filter to only Price|Carbon variable
+    melted_data = pd.melt(variable_data, id_vars=['Scenario', 'Model', 'Region', 'Unit', 'Variable', 'Category'],
+                            var_name='Year', value_name='Value')
+    melted_data['Year'] = melted_data['Year'].astype(int)
+    melted_data = melted_data[melted_data['Year'] >= 2020]
+    # keep only 10 year intervals
+    melted_data = melted_data[melted_data['Year'] % 10 == 0]
+    # get the median timeseries trajectory across all scenarios from year 2020 to 2100
+    median_trajectory = melted_data.groupby('Year')['Value'].median().reset_index()
+    median_trajectory.to_csv(OUTPUT_DIR + 'price_carbon_median_data.csv', index=False)
+
+
 
     # for category in variable_data['Category'].unique():
     #     print(f"Calculating correlation for category: {category}")
@@ -89,19 +101,82 @@ def main():
     # plot_dendrogram_with_threshold(correlation_matrix_global, method='average')
     # new_variable_weights = compute_weights_flat(correlation_matrix_global)
     # # print(new_variable_weights)
+    # run_database_segment_sensitivity(pairwise_rms_ar6, 
+    #                                     sigma_values, 
+    #                                     '0.2', 
+    #                                     'ar6', 
+    #                                     CORREL_ADJUSTED_WEIGHTS_FLAT_HC, 
+    #                                     ar6_tier_0_data,
+    #                                     meta_data=meta,
+    #                                     category_groupings=[['C1','C2','C3','C4','C5','C6']])
+
+
+# function that performs sensitivity to reduced size of the database.
+def run_database_segment_sensitivity(database_pairwise : pd.DataFrame, 
+                                     sigma_file : pd.DataFrame, 
+                                     sigma : str, 
+                                     database : str, 
+                                     variables_info : dict,
+                                     ar6_tier_0_data: pd.DataFrame,
+                                     meta_data : pd.DataFrame,
+                                     category_groupings : list):
+
+    """
+    This function performs sensitivity analysis on the database by segmenting it based on the specified categories
+    and calculating the impact on the weighting effects overall.
+
+    Inputs:
+    - database_pairwise: DataFrame containing pairwise comparisons for the database.
+    - sigma_file: DataFrame containing sigma values for the database.
+    - sigma: The specific sigma value to analyze.
+    - database: The name of the database being analyzed.
+    - variables: A dictionary mapping variable names to their metadata.
+    - category_groupings: A list of category groupings to segment the database by.
+
+    Outputs:
+    - the relevant variable weight and composite weight files used for plotting in
+    outputs/sensitivity dir
+    
+    """
+    sigma_values = sigma_file[sigma].to_dict()
+    # Segment the database based on the specified categories
+    for category_grouping in category_groupings:
+
+        category_meta = meta_data[meta_data['Category'].isin(category_grouping)]
+        
+        # Filter the pairwise DataFrame to include only scenarios in the current category
+        database_pairwise_category = database_pairwise[
+            database_pairwise['Scenario_1'].isin(category_meta['Scenario']) &
+            database_pairwise['Model_1'].isin(category_meta['Model'])]
+        database_pairwise_category = database_pairwise_category[database_pairwise_category['Scenario_2'].isin(category_meta['Scenario']) & 
+                                              database_pairwise_category['Model_2'].isin(category_meta['Model'])]
+        
+        output_id = f"{category_grouping}_{sigma}_correl"
+        # check if file exists first
+        if os.path.exists(DIVERSITY_OUTPUT_DIR + f'sensitivity/variable_weights_{database}_{output_id}.csv'):
+            variable_weights = read_csv(DIVERSITY_OUTPUT_DIR + f"sensitivity/variable_weights_{database}_{output_id}.csv")
+        else:
+            variable_weights = calculate_variable_weights(database_pairwise_category, 
+                                       sigma_values, database, 
+                                       f'{category_grouping}_{sigma}_correl', TIER_0_VARIABLES, return_df=True, sensitivity='sensitivity/')
+
+        calculate_composite_weight(variable_weights, ar6_tier_0_data, 
+                                f'{output_id}', variables_info, output_dir=DIVERSITY_OUTPUT_DIR + 'sensitivity/')
 
 
 
-def calculate_range_variable_weights(database_pairwise, sigma_file, database, variables=TIER_0_VARIABLES):
+def calculate_range_variable_weights(database_pairwise, sigma_file, database, variables=TIER_0_VARIABLES,sigmas=None):
 
-    sigmas = ['0.0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0']
+    if sigmas is None:
+        sigmas = ['min', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', 'max']
+    else:
+        sigmas = sigmas
     print(sigma_file)
     for sigma in sigmas:
         sigma_values = sigma_file[sigma].to_dict()
         print(sigma_values)
         calculate_variable_weights(database_pairwise, sigma_values, database, sigma + '_sigma', variables)
         print(f"Variable weights calculated for sigma {sigma}")
-
 
 
 # Function to Calculate sigma values
@@ -185,6 +260,25 @@ def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables):
         sigma_dict[variable]['max'] = max_diff
         sigma_dict[variable]['min'] = min_diff
 
+        n_below = 5           # how many values you want below min
+        min_fraction = 0.1    # lowest fraction of min to include (e.g. min/10)
+
+        if min_diff > 0:
+            below = np.logspace(
+                np.log10(min_diff * min_fraction),
+                np.log10(min_diff),
+                num=n_below + 1,
+                endpoint=False
+            )
+        else:
+            # if min_diff is zero, just fill with zeros
+            below = [0.0] * n_below
+
+        # Store these with labels
+        for i, val in enumerate(below, start=1):
+            sigma_dict[variable][f"log_below_{i}"] = float(val)
+    
+    
     # sigma_dict to dataframe
     sigma_values = pd.DataFrame.from_dict(sigma_dict, orient='index').reset_index()
     # sigma_values.columns = ['Variable', 'min', '5th', 'q1', 'median', 'q3', '95th', 'max']
@@ -284,16 +378,16 @@ def rms(i, j):
     return np.sqrt(np.mean((i - j) ** 2))
 
 
-# Function that reweights the scenarios based on the pairwise RMS distances and the signma input
-def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, variables, return_df=False):
+# Function that reweights the scenarios based on the pairwise RMS distances and the sigma input
+def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, variables, return_df=False, sensitivity=None):
 
     """
     Calculate weights for each variable and scenario based on pairwise RMS distances and sigma values.
 
     Inputs:
         pairwise_rms_df (DataFrame): DataFrame containing pairwise RMS distances.
-        sigmas (DataFrame): DataFrame containing sigma values for each variable.
-        database (str): The database to use for the analysis 
+        sigmas (dict): Dictionary containing sigma values for each variable.
+        database (str): The database to use for the analysis
         output_id (str): Identifier for the output file.
 
     Returns:
@@ -312,8 +406,7 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, var
     index = {pair: i for i, pair in enumerate(model_scen_list)}
     n = len(model_scen_list)
 
-    # Unique variable (may vary depending on the database, see docs)
-    # variables = pairwise_rms_df['Variable'].unique()
+    # Unique variable (may vary depending on the database)
 
     # loop through each variable 
     for variable in tqdm(variables, desc="Calculating weights by variable"):
@@ -346,15 +439,15 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, var
             })
 
     variable_weights_df = pd.DataFrame(results)
-    # variable_weights_df['Weight'] = variable_weights_df.groupby('Variable')['Raw Weight'].transform(lambda x: x / x.sum())
+    variable_weights_df['Weight'] = variable_weights_df.groupby('Variable')['Raw Weight'].transform(lambda x: x / x.sum())
     # Note: Z-score normalisation applied to the raw weights for each variable ensuring that diversity 
     # in the variables is maintained across the scenarios but crucially that the magnitude of the weights is comparable.
-    variable_weights_df['Weight'] = variable_weights_df.groupby('Variable')['Raw Weight'].transform(
-        lambda x: (x - x.mean()) / x.std()
-    )
+    # variable_weights_df['Weight'] = variable_weights_df.groupby('Variable')['Raw Weight'].transform(
+    #     lambda x: (x - x.mean()) / x.std()
+    # )
 
     # Save output
-    variable_weights_df.to_csv(OUTPUT_DIR + f'variable_weights_{database}_{output_id}.csv', index=False)
+    variable_weights_df.to_csv(DIVERSITY_OUTPUT_DIR + f'{sensitivity}variable_weights_{database}_{output_id}.csv', index=False)
 
     if return_df:
         return variable_weights_df
@@ -362,7 +455,7 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, var
 
 # combines the weights from each of the variables using the group and sub-group weights
 def calculate_composite_weight(weighting_data_file, original_scenario_data, output_id, variable_info=VARIABLE_INFO, 
-                               flat_weights=None):
+                               flat_weights=None, output_dir=DIVERSITY_OUTPUT_DIR):
 
     """
     Function that combines the weights from each of the variables using the group and sub-group weights. Allows for underreporting
@@ -426,10 +519,7 @@ def calculate_composite_weight(weighting_data_file, original_scenario_data, outp
             variable_df = variable_df.rename(columns={'index': 'Variable'})
             variable_df['variable_weight'] = variable_df['group_weight'] * variable_df['subgroup_weight']
     
-        # if raw:
-        #     # if raw is True, we just want to use the raw weights
-        #     scenario_weighting_data['Weight'] = scenario_weighting_data['Raw Weight']
-        
+
         scenario_weighting_data = scenario_weighting_data.merge(
             variable_df[['Variable', 'variable_weight']],
             on='Variable',
@@ -443,19 +533,18 @@ def calculate_composite_weight(weighting_data_file, original_scenario_data, outp
             scenario_weighting_data['Weight'] * scenario_weighting_data['variable_weight']
         ))
 
-    # min max normalise the weights and invert them.
+
     # NOTE: thus far, the weights are not inverted. High weighting at this point
     # means the scenario is more similar to the others, and thus less diverse.
     # Inverting the weights means that high weighting means the scenario is more diverse.
-    # Min-max normalisation is applied to ensure the weights are positive.
     weights = np.array(weights)
     
-    # Invert the weights
-    inverted_weights = -weights
-
-    if min(inverted_weights) < 0:
-        # If the minimum weight is negative, we need to shift the weights to make them all positive
-        inverted_weights = inverted_weights - np.min(inverted_weights)
+    # Rank invert the weights
+    inverted_weights = weights.max() - weights + weights.min()
+    
+    # if min(inverted_weights) < 0:
+    #     # If the minimum weight is negative, we need to shift the weights to make them all positive
+    #     inverted_weights = inverted_weights - np.min(inverted_weights)
 
     # Normalise to probability distribution
     final_weights = inverted_weights / np.sum(inverted_weights)  # normalise the weights to sum to 1
@@ -469,7 +558,7 @@ def calculate_composite_weight(weighting_data_file, original_scenario_data, outp
     })
 
     # output to a CSV file
-    output_df.to_csv(OUTPUT_DIR + f'composite_weights_{output_id}.csv', index=False)
+    output_df.to_csv(output_dir + f'composite_weights_{output_id}.csv', index=False)
     return output_df
 
 
@@ -542,13 +631,13 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
         sigma_df = read_csv(OUTPUT_DIR + f"variable_weights_{database}_{sigma}_sigma.csv")
         variables = sigma_df['Variable'].unique().tolist()
 
-        sigma_df['Weight'] = -sigma_df['Weight']
-        if min(sigma_df['Weight']) < 0:
+        # sigma_df['Weight'] = -sigma_df['Weight']
+        # if min(sigma_df['Weight']) < 0:
 
-            # If the minimum weight is negative, we need to shift the weights to make them all positive
-            sigma_df['Weight'] = sigma_df['Weight'] - np.min(sigma_df['Weight'])
+        #     # If the minimum weight is negative, we need to shift the weights to make them all positive
+        #     sigma_df['Weight'] = sigma_df['Weight'] - np.min(sigma_df['Weight'])
 
-        sigma_df['Weight'] = sigma_df['Weight'] / np.sum(sigma_df['Weight'])
+        # sigma_df['Weight'] = sigma_df['Weight'] / np.sum(sigma_df['Weight'])
 
         iqrs = []
         effective_sample_size = []
@@ -559,7 +648,7 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
 
             # get the IQR of the weights
             iqrs.append(variable_df['Weight'].quantile(0.75) - variable_df['Weight'].quantile(0.25))
-
+                        
             # calculate the effective sample size
             effective_sample_size.append(1 / sum(variable_df['Weight']**2))
 

@@ -8,11 +8,12 @@ Date: 8/8/25
 """
 
 import pandas as pd
+import diversity
 import numpy as np
 import wquantiles
 import seaborn as sns
 import matplotlib.pyplot as plt
-from utils import read_csv, add_meta_cols, get_cumulative_values_pandas
+from utils import read_csv, add_meta_cols, get_cumulative_values_pandas, model_family
 from diversity import calculate_composite_weight
 from constants import *
 
@@ -22,45 +23,57 @@ def main():
     Main function to run the analysis.
     """
     # Define the parameters for the analysis
-    sigma_values = ['0.00', '0.25', '0.50', '0.70', '1.00']
+    sigma_values = ['log_below_4', 'min', '0.2', '0.5', 'max']
     variable_weight_approaches = [
-        'expert', 'flat']
+        'expert', 'correl', 'energy_only', 'emissions_only']
 
     variables_with_meta = read_csv(INPUT_DIR + 'ar6_data_with_plotting_meta.csv')
     ar6_meta = read_csv(INPUT_DIR + 'ar6_meta_data.csv')
 
     # # add additional metadata columns
-    # variables_with_meta = add_meta_cols(variables_with_meta, ar6_meta, 
-    #                                     metacols=['Median peak warming (MAGICCv7.5.3)', 'Median warming in 2100 (MAGICCv7.5.3)'])
-
-    ar6_meta.reset_index(inplace=True)
-    variables_with_meta_indicators = ['Net zero CO2 year_harmonised', 'Net zero GHG year_harmonised',
-                                      'Emissions Reductions_GHGs_2050', 'Median peak warming (MAGICCv7.5.3)',
-                                      'Median warming in 2100 (MAGICCv7.5.3)']
+    variables_with_meta = add_meta_cols(variables_with_meta, ar6_meta.copy(), 
+                                        metacols=['Median peak warming (MAGICCv7.5.3)'])
+    variables_with_meta_indicators = ['Net zero CO2 year_harmonised', 'Net zero GHG year_harmonised','Median peak warming (MAGICCv7.5.3)']
     
     tier_0_data = read_csv(INPUT_DIR + 'ar6_pathways_tier0.csv')
+    tier_0_data = add_meta_cols(tier_0_data, ar6_meta.copy(), metacols=['Category', 'Category_subset'])
+    
     cumulative_vars = ['Final Energy', 'Primary Energy|Coal', 'Primary Energy|Oil',
                        'Primary Energy|Gas', 'Primary Energy|Nuclear', 'Primary Energy|Biomass',
                        'Primary Energy|Non-Biomass Renewables', 'Carbon Sequestration|CCS']
 
-    # build_analysis_table_sensitivities(sigma_values, variable_weight_approaches, 
-    #                                    variables_with_meta, variables_with_meta_indicators, tier_0_data,
-    #                                    cumulative_vars, [['C2']], output_id='hc_C2', meta_data=ar6_meta)
+    model_family_df = read_csv(INPUT_DIR + 'model_family.csv')
+    variables_with_meta = model_family(variables_with_meta, model_family_df, Model_type=True)
+    variables_with_meta = add_meta_cols(variables_with_meta, ar6_meta.copy(), metacols=['Policy_category'])
+    
+    build_analysis_table_sensitivities(sigma_values, variable_weight_approaches, 
+                                       variables_with_meta, variables_with_meta_indicators, tier_0_data,
+                                       cumulative_vars, [['C1'], ['C2']], output_id='v5', meta_data=ar6_meta, diversity=False)
+
+    down_cols = ['Net zero CO2 year_harmonised', 'Net zero GHG year_harmonised', 
+    'Primary_Oil_Gas_2030', 'Primary_Oil_Gas_2050', 'Final Energy_cumulative', 
+    'Primary Energy|Coal_cumulative', 'Primary Energy|Oil_cumulative', 
+    'Primary Energy|Gas_cumulative']
+
+    up_cols = ['Carbon Sequestration|CCS_cumulative', 
+    'Primary Energy|Non-Biomass Renewables_cumulative', 
+    'Primary Energy|Nuclear_cumulative', 'Emissions Reductions_GHGs_2050']
 
 
-    sigma = '0.70'
-    approach = 'flat'
-    database = 'ar6'
-    weights_input = read_csv(OUTPUT_DIR + f'composite_weights_ar6_{sigma}_sigma_{approach}_weights.csv')
-    quality_weights = read_csv(OUTPUT_DIR + 'quality_weights_ar6.csv')
 
-    combined_weights(quality_weights, weights_input, database, sigma, approach)
+    # sigma = '0.2'
+    # approach = 'correl'
+    # database = 'ar6'
+    # weights_input = read_csv(DIVERSITY_OUTPUT_DIR + f'composite_weights_ar6_{sigma}_sigma_{approach}_weights.csv')
+    # quality_weights = read_csv(OUTPUT_DIR + 'quality_weights_ar6.csv')
+
+    # combined_weights(quality_weights, weights_input, database, sigma, approach)
 
 
     # # add the weights columns
     # variables_with_meta = variables_with_meta.merge(weights_input,
     #                                                on=['Model', 'Scenario'],
-    # #                                                how='left')
+    #                                                 how='left')
     # print(variables_with_meta.head())
     # output_id = f'ar6_{approach}_{sigma}'
     # jackknife_analysis(CATEGORIES_15, ['Model_family', 'Project'], ASSESSMENT_VARIABLES, variables_with_meta, output_id=output_id)
@@ -79,11 +92,12 @@ def combined_weights(quality_weights, diversity_weights, database, sigma, weight
     combined_df.to_csv(OUTPUT_DIR + f'combined_weights_{database}_{sigma}_sigma_{weighting_approach}_weights.csv', index=False)
 
 
+
 # Function to build analysis table for sensitivities
 def build_analysis_table_sensitivities(sigma_values, variable_weight_approaches, 
                                        variables_with_meta, variables_with_meta_indicators, tier_0_data,
                                         cumulative_vars, temperature_categories, output_id='',
-                                       meta_data=None):
+                                       meta_data=None, diversity=True):
 
     """
     Sensitivity analysis table builder. This function puts together a table that looks at the impact 
@@ -135,18 +149,20 @@ def build_analysis_table_sensitivities(sigma_values, variable_weight_approaches,
             indicator_col.append(indicator)
             value_col.append(np.median(cat_variables_with_meta[indicator]))
 
-        for database_characteristic in ['Model_family', 'Project']:
-            
-            # Calculate the Shannon Hill number and HHI for the unweighted data
-            shannon_hill, hhi = return_database_characteristics_shannon_hill(cat_variables_with_meta, database_characteristic, weights=False)
-            sigma_col.append('Unweighted')
-            approach_col.append('Unweighted')
-            indicator_col.append(f'Shannon_Hill_{database_characteristic}')
-            value_col.append(shannon_hill)
-            sigma_col.append('Unweighted')
-            approach_col.append('Unweighted')
-            indicator_col.append(f'HHI_{database_characteristic}')
-            value_col.append(hhi)
+        if diversity==True:
+            print("Calculating diversity metrics for unweighted data.")
+            for database_characteristic in ['Model_family', 'Model_type', 'Project', 'Policy_category']:
+                
+                # Calculate the Shannon Hill number and HHI for the unweighted data
+                shannon_hill, hhi = return_database_characteristics_shannon_hhi(cat_variables_with_meta, database_characteristic, weights=False)
+                sigma_col.append('Unweighted')
+                approach_col.append('Unweighted')
+                indicator_col.append(f'Shannon_{database_characteristic}')
+                value_col.append(shannon_hill)
+                sigma_col.append('Unweighted')
+                approach_col.append('Unweighted')
+                indicator_col.append(f'HHI_{database_characteristic}')
+                value_col.append(hhi)
 
         # convert cat_tier_0_data to long format
         cat_tier_0_data = cat_tier_0_data.melt(id_vars=['Model', 'Scenario', 'Region','Unit', 'Variable', 'Category', 'Category_subset'],
@@ -172,9 +188,8 @@ def build_analysis_table_sensitivities(sigma_values, variable_weight_approaches,
                 # extract or run the composite weights for the current sigma value and weighting approach
                 try:
                     # read the variable weights for the current sigma value
-                    scenario_composite_weights = read_csv(OUTPUT_DIR + f'composite_weights_ar6_{sigma}_sigma_{approach}_weights.csv')
+                    scenario_composite_weights = read_csv(DIVERSITY_OUTPUT_DIR + f'composite_weights_ar6_{sigma}_sigma_{approach}_weights.csv')
 
-                
                 except FileNotFoundError:
                     print(f"File not found for sigma {sigma} and approach {approach}. Running the composite weight calculation.")
                     # If the file is not found, run the composite weight calculation
@@ -215,13 +230,14 @@ def build_analysis_table_sensitivities(sigma_values, variable_weight_approaches,
                     approach_col.append(approach)
                     indicator_col.append(var + '_cumulative')
                     value_col.append(weighted_median)
-
+                if diversity==False:
+                    continue
                 # calculate the Shannon Hill number and HHI for the current sigma value and approach
-                for database_characteristic in ['Model_family', 'Project']:
-                    shannon_hill, hhi = return_database_characteristics_shannon_hill(variables_with_meta_approach_sigma, database_characteristic, weights=True)
+                for database_characteristic in ['Model_family', 'Model_type', 'Project', 'Policy_category']:
+                    shannon_hill, hhi = return_database_characteristics_shannon_hhi(variables_with_meta_approach_sigma, database_characteristic, weights=True)
                     sigma_col.append(sigma)
                     approach_col.append(approach)
-                    indicator_col.append(f'Shannon_Hill_{database_characteristic}')
+                    indicator_col.append(f'Shannon_{database_characteristic}')
                     value_col.append(shannon_hill)
                     sigma_col.append(sigma)
                     approach_col.append(approach)
@@ -237,16 +253,14 @@ def build_analysis_table_sensitivities(sigma_values, variable_weight_approaches,
         })])
 
     
-
     # make the analysis table wide format
     analysis_df = analysis_table.pivot_table(index=['Category', 'Variable Weights', 'Sigma'], 
-                                             columns='Indicator', values='Value').reset_index()
-    
-    
+                                             columns='Indicator', values='Value', sort=False).reset_index()
+
     prct_df = pd.DataFrame()
     
     #for each category grouping, filter for unweighted, and calculate the % diff for the rest of the values
-    for category in analysis_df['Category'].unique():
+    for category in analysis_df['Category']:
         # get the unweighted row for the current category
         unweighted_row = analysis_df[(analysis_df['Category'] == category) & (analysis_df['Variable Weights'] == 'Unweighted')].copy()
        
@@ -259,11 +273,12 @@ def build_analysis_table_sensitivities(sigma_values, variable_weight_approaches,
                 prct_df.loc[analysis_df['Category'] == category, col] = (analysis_df.loc[analysis_df['Category'] == category, col] - unweighted_row[col].values[0]) / unweighted_row[col].values[0] * 100
 
 
+
+
     # output the analysis table to a CSV file
     # prct_df.to_csv(OUTPUT_DIR + 'analysis_table_sensitivities.csv', index=False)
-    analysis_df.to_csv(OUTPUT_DIR + 'analysis_table_sensitivities_' + output_id + '_raw.csv', index=False)
+    analysis_df.to_csv(OUTPUT_DIR + 'analysis_table_sensitivities_' + output_id + '_raw.csv')
     prct_df.to_csv(OUTPUT_DIR + 'analysis_table_sensitivities_' + output_id + '.csv', index=False)
-
 
     # # make heatmaps of the analysis table
     # prct_df = prct_df.set_index(['Category', 'Variable Weights', 'Sigma'])
@@ -273,10 +288,10 @@ def build_analysis_table_sensitivities(sigma_values, variable_weight_approaches,
 
 
 
-# Function that calculates the Shannon Hill number and Herfindahl–Hirschman Index (HHI) / Simpson concentration
-def return_database_characteristics_shannon_hill(df_results, mode, weights=False):
+# Function that calculates the Shannon number and Herfindahl–Hirschman Index (HHI) / Simpson concentration
+def return_database_characteristics_shannon_hhi(df_results, mode, weights=False):
 
-    """Calculates the Shannon Hill number and Herfindahl–Hirschman Index (HHI) / Simpson concentration
+    """Calculates the Shannon number and Herfindahl–Hirschman Index (HHI) / Simpson concentration
     based on the shares by assessment mode for the database: e.g., model family, project. 
     
     Parameters:
@@ -300,12 +315,12 @@ def return_database_characteristics_shannon_hill(df_results, mode, weights=False
         mode_shares = np.array(mode_shares)
 
     # Calculate the Shannon Hill number
-    shannon_hill = -1 * np.sum([(x / mode_shares.sum()) * np.log(x / mode_shares.sum()) for x in mode_shares if x > 0])
+    shannon = -1 * np.sum([(x / mode_shares.sum()) * np.log(x / mode_shares.sum()) for x in mode_shares if x > 0])
 
     # Calculate the Herfindahl–Hirschman Index (HHI) / Simpson concentration
     hhi = np.sum([(x / mode_shares.sum()) ** 2 for x in mode_shares])
 
-    return shannon_hill, hhi
+    return shannon, hhi
 
 
 
@@ -360,7 +375,7 @@ def jackknife_analysis(categories, modes, variables, results_df, output_id=''):
             for percentile in percentile_list:
 
                 # calculate the unweighted and reweighted percentiles
-                value = np.percentile(df_results_cat[variable], (percentile*100))
+                value = np.percentile(df_results_cat[variable], (percentile*100),method='inverted_cdf')
                 reweighted_value = wquantiles.quantile(df_results_cat[variable], df_results_cat['Weight'], percentile)
 
                 # append the values to the value list
@@ -398,7 +413,7 @@ def jackknife_analysis(categories, modes, variables, results_df, output_id=''):
                     for percentile in percentile_list:
 
                         # calculate the unweighted and reweighted percentiles
-                        value = np.percentile(df_results_other[variable], (percentile*100))
+                        value = np.percentile(df_results_other[variable], (percentile*100), method='inverted_cdf')
                         reweighted_value = wquantiles.quantile(df_results_other[variable], df_results_other['Weight'], percentile)
 
                         # append the values to the value list
@@ -429,7 +444,7 @@ def jackknife_analysis(categories, modes, variables, results_df, output_id=''):
                                 'Value': value_list})
     
     # export the results to a csv file
-    export_df.to_csv(OUTPUT_DIR + f'jackknife_results_{output_id}.csv', index=False)
+    export_df.to_csv(DIVERSITY_OUTPUT_DIR + f'jackknife_results_{output_id}.csv', index=False)
 
 
 
