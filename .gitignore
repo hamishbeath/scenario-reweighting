@@ -4,8 +4,7 @@ outputs/
 sci/
 manuscript/
 src/plotting.py
-
-
+src/main.py
 git
 
 

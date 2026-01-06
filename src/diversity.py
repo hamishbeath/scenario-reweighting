@@ -10,10 +10,9 @@ from constants import *
 from itertools import combinations
 from utils.file_parser import read_csv
 from utils.utils import add_meta_cols, data_download_sub
-from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
+from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
 from sklearn.metrics import silhouette_score
-
 
 
 def main():
@@ -247,15 +246,7 @@ def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables):
         min_diff = np.min(pairwise_rms_dists)
         max_diff = np.max(pairwise_rms_dists)
 
-        # sigma_dict[variable] = {
-        #     'min': min_diff,
-        #     '5th': quantiles[0],
-        #     'q1': quantiles[1],
-        #     'median': quantiles[2],
-        #     'q3': quantiles[3],
-        #     '95th': quantiles[4],
-        #     'max': max_diff
-        # }
+
         sigma_dict[variable] = {f"{q:.2f}": quantiles[i] for i, q in enumerate(quantiles_to_run)}
         sigma_dict[variable]['max'] = max_diff
         sigma_dict[variable]['min'] = min_diff
@@ -294,7 +285,7 @@ def calculate_pairwise_rms_distances(data, variables, database, start_year=2020,
     Function that returns a DataFrame with pairwise RMS distances for each variable, for each
     pair of scenarios in the database.
 
-    Parameters:
+    Inputs:
     data (DataFrame): The scenario data containing the tier 0 variable data
     variables (list): List of variables to calculate pairwise RMS distances for.
     database (str): The database to use for the analysis. If 'sci', it uses the Scenario Compass database.
@@ -379,7 +370,8 @@ def rms(i, j):
 
 
 # Function that reweights the scenarios based on the pairwise RMS distances and the sigma input
-def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, variables, return_df=False, sensitivity=None):
+def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, 
+                               variables, return_df=False, sensitivity=None):
 
     """
     Calculate weights for each variable and scenario based on pairwise RMS distances and sigma values.
@@ -440,11 +432,6 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, var
 
     variable_weights_df = pd.DataFrame(results)
     variable_weights_df['Weight'] = variable_weights_df.groupby('Variable')['Raw Weight'].transform(lambda x: x / x.sum())
-    # Note: Z-score normalisation applied to the raw weights for each variable ensuring that diversity 
-    # in the variables is maintained across the scenarios but crucially that the magnitude of the weights is comparable.
-    # variable_weights_df['Weight'] = variable_weights_df.groupby('Variable')['Raw Weight'].transform(
-    #     lambda x: (x - x.mean()) / x.std()
-    # )
 
     # Save output
     variable_weights_df.to_csv(DIVERSITY_OUTPUT_DIR + f'{sensitivity}variable_weights_{database}_{output_id}.csv', index=False)
@@ -542,10 +529,6 @@ def calculate_composite_weight(weighting_data_file, original_scenario_data, outp
     # Rank invert the weights
     inverted_weights = weights.max() - weights + weights.min()
     
-    # if min(inverted_weights) < 0:
-    #     # If the minimum weight is negative, we need to shift the weights to make them all positive
-    #     inverted_weights = inverted_weights - np.min(inverted_weights)
-
     # Normalise to probability distribution
     final_weights = inverted_weights / np.sum(inverted_weights)  # normalise the weights to sum to 1
 
@@ -568,7 +551,7 @@ def adjust_weights_for_missing_variables(missing_variables, variable_info):
     """
     Function returns new group and sub-group weights for the scenario
 
-    Parameters:
+    Inputs:
     missing_variables (list): List of variables that are missing from the scenario.
     variable_info (dict): Dictionary containing the variable information including group and sub-group weights.
 
@@ -612,7 +595,7 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
     the **normalised IQR for each variable**, calculates the mean IQR for the set and 
     saves to a CSV file.
 
-    Parameters:
+    Inputs:
     database (str): The database to use for the analysis.
     sigma_values (list): Sigma values to test (used for file extraction).
 
@@ -669,16 +652,7 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
     # Save the stats DataFrame to a CSV file
     stats.to_csv(OUTPUT_DIR + f'sigma_greatest_diversity_{database}.csv', index=False)
 
-        #    # plot the weights as a distribution showing the IQR
-        #     plt.figure(figsize=(10, 6))
-        #     plt.hist(variable_df['Weight'], bins=30, alpha=0.7, color='blue', edgecolor='black')
-        #     plt.title(f'Weight Distribution for {variable} (Sigma: {sigma})')
-        #     plt.xlabel('Weight')
-        #     plt.ylabel('Frequency')
-        #     plt.axvline(variable_df['Weight'].quantile(0.25), color='red', linestyle='dashed', linewidth=1, label='Q1')
-        #     plt.axvline(variable_df['Weight'].quantile(0.75), color='green', linestyle='dashed', linewidth=1, label='Q3')
-        #     plt.legend()
-        #     plt.show()
+
 
 
 # Determine variable weights based on their correlation with each other
@@ -694,7 +668,7 @@ def get_variable_correlation_matrix(variable_data, variables, output_id):
     The resulting correlation matrix can then be used to determine the weights for each variable. This can be
     done at the variable group level, or at the single variable level.
     
-    Parameters:
+    Inputs:
     - variable_data (DataFrame): The scenario data containing the tier 0 variable data, timeseries data 2020:2100.
     - variables (list): List of variables to calculate correlation for.
     - variable_groups (dict): Dictionary containing the variable groups and their weights.
@@ -729,8 +703,8 @@ def get_variable_correlation_matrix(variable_data, variables, output_id):
     # Group by scenario identifiers
     scenario_groups = df.groupby(['Scenario', 'Model', 'Region', 'Unit'])
 
-    scenario_corrs = {}            # {scenario_key: correlation matrix}
-    scenario_categories = {}       # {scenario_key: category}
+    scenario_corrs = {}           
+    scenario_categories = {}      
 
     for scenario_key, group in tqdm(scenario_groups):
         category = group['Category'].iloc[0]
@@ -775,10 +749,10 @@ def get_variable_correlation_matrix(variable_data, variables, output_id):
 def get_snapshot_variable_correlation(variable_data, variables, output_id):
     """
     Calculates variable correlation matrices based on snapshots in time (e.g. decadal values).
-    For each year, we compute correlation across scenarios between variables. Then we average the
-    correlation matrices over time to get a single correlation matrix.
+    For each year, correlation computed across scenarios between variables. 
+    Correlation matrices averaged over time to get a single correlation matrix.
 
-    Parameters:
+    Inputs
     - variable_data (DataFrame): The scenario data with timeseries columns (e.g. 2020 to 2100).
     - variables (list): List of variable names to include.
     - output_id (str): ID for naming output files.
@@ -825,7 +799,6 @@ def get_snapshot_variable_correlation(variable_data, variables, output_id):
     aligned_corrs = pd.concat(yearly_corrs.values(), keys=yearly_corrs.keys())
     mean_corr = aligned_corrs.groupby(level=1).mean()
 
-    
     mean_corr.to_csv(os.path.join(OUTPUT_DIR, f'variable_correlation_matrix_{output_id}_SNAPSHOT.csv'))
     yearly_corrs_df = pd.concat(yearly_corrs, axis=0)
     yearly_corrs_df.to_csv(os.path.join(OUTPUT_DIR, f'variable_correlation_matrix_{output_id}_SNAPSHOT_YEARLY.csv'))
@@ -840,20 +813,21 @@ def compute_weights_preserve_group(corr_matrix, variable_info):
 
     final_weights = {}
 
+    # Loop through each group, variables
     for group, variables in group_vars.items():
-        # Subset correlation matrix for group
+
         sub_corr = corr_matrix.loc[variables, variables]
 
         # Compute redundancy score (sum of correlations per variable)
         redundancy = sub_corr.sum(axis=1)
 
-        # Invert: higher score = more independent
+        # Higher score means more redundant
         informativeness = 1 / redundancy.replace(0, np.nan)
 
-        # Replace NaNs (fully independent) with max informativeness
+        # Replace NaNs 
         informativeness = informativeness.fillna(informativeness.max())
 
-        # Normalise within group
+        # Normalise 
         informativeness_weights = informativeness / informativeness.sum()
 
         for var in variables:
@@ -871,60 +845,33 @@ def compute_weights_preserve_group(corr_matrix, variable_info):
 
 def compute_weights_flat(corr_matrix):
 
-
-    # Correlations calculated
-    # avg_corr = corr_matrix.abs().mean()
-
     squared_corr = corr_matrix.pow(2).mean()
-
-    # Inverse of redundancy (more unique variables get higher weights)
     inverse_redundancy = 1 / squared_corr
-
-    # Normalise to probability distribution
     weights = inverse_redundancy / inverse_redundancy.sum()
     return weights.to_dict()
  
 
 def run_hierarchical_clustering(corr_matrix, threshold=0.5):
     """
-    Perform hierarchical clustering on the correlation matrix and return clusters of variables.
+    Perform hierarchical clustering on the variable correlation matrix
     
-    Parameters:
+    Inputs:
     - corr_matrix (DataFrame): The correlation matrix of variables.
     - threshold (float): The threshold for clustering. Default is 0.5.
     
     Returns:
     - clusters (list): List of lists, where each inner list contains variable names in a cluster.
     """
-    
-    # # Check for high correlations
-    # high_corr_pairs = []
-    # for i in range(len(corr_matrix.columns)):
-    #     for j in range(i+1, len(corr_matrix.columns)):
-    #         corr_val = corr_matrix.iloc[i,j]
-    #         if abs(corr_val) > 0.6:  # adjust threshold as needed
-    #             high_corr_pairs.append((corr_matrix.columns[i], 
-    #                                     corr_matrix.columns[j], 
-    #                                     corr_val))
-
-    # print(f"Found {len(high_corr_pairs)} pairs with |correlation| > 0.6:")
-    # for pair in high_corr_pairs[:10]:  # show first 10
-    #     print(f"{pair[0]} - {pair[1]}: {pair[2]:.3f}")
-
-    from scipy.cluster.hierarchy import linkage, fcluster
-    from scipy.spatial.distance import squareform
-
-    # Convert correlation to distance
+    # Correlation to distance
     distance_matrix = 1 - corr_matrix.abs()
     condensed_distances = squareform(distance_matrix)
 
-    # Perform hierarchical clustering
+    # Hierarchical clustering
     linkage_matrix = linkage(condensed_distances, method='average')
 
-    # Form flat clusters
+    # Flat clusters
     cluster_labels = fcluster(linkage_matrix, threshold, criterion='distance')
 
-    # Group variables by cluster labels
     clusters = {}
     for var, label in zip(corr_matrix.columns, cluster_labels):
         clusters.setdefault(label, []).append(var)
@@ -955,48 +902,9 @@ def find_optimal_threshold(corr_matrix, method='average'):
     return thresholds, n_clusters
   
 
-def evaluate_clustering_quality(corr_matrix, method='average'):
-    distance_matrix = 1 - corr_matrix.abs()
-    condensed_distances = squareform(distance_matrix)
-    linkage_matrix = linkage(condensed_distances, method=method)
-    
-    thresholds = np.arange(0.2, 0.8, 0.05)
-    silhouette_scores = []
-    
-    for threshold in thresholds:
-        clusters = fcluster(linkage_matrix, threshold, criterion='distance')
-        if len(np.unique(clusters)) > 1:  # Need at least 2 clusters
-            score = silhouette_score(distance_matrix, clusters, metric='precomputed')
-            silhouette_scores.append(score)
-        else:
-            silhouette_scores.append(-1)
-    
-    plt.figure(figsize=(10, 6))
-    plt.plot(thresholds, silhouette_scores, 'go-')
-    plt.xlabel('Threshold')
-    plt.ylabel('Silhouette Score')
-    plt.title('Clustering Quality vs Threshold')
-    plt.grid(True)
-    plt.show()
-    
-    best_idx = np.argmax(silhouette_scores)
-    return thresholds[best_idx], silhouette_scores[best_idx]
 
 
-def plot_dendrogram_with_threshold(corr_matrix, method='average'):
-    distance_matrix = 1 - corr_matrix.abs()
-    condensed_distances = squareform(distance_matrix)
-    linkage_matrix = linkage(condensed_distances, method=method)
-    
-    plt.figure(figsize=(12, 8))
-    dendrogram(linkage_matrix, labels=corr_matrix.columns, orientation='top', leaf_rotation=45)
-    plt.axhline(y=0.4, color='red', linestyle='--', label='Threshold=0.4')
-    plt.axhline(y=0.5, color='orange', linestyle='--', label='Threshold=0.5')
-    plt.xlabel('Distance')
-    plt.title('Hierarchical Clustering Dendrogram')
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+
 
   
 if __name__ == "__main__":
