@@ -2,8 +2,8 @@ inputs/
 revisions/
 outputs/
 sci/
-mansucript/
-
+manuscript/
+src/plotting.py
 
 
 git
