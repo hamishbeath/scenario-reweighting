@@ -15,23 +15,51 @@ from scipy.spatial.distance import squareform
 from sklearn.metrics import silhouette_score
 
 
-def main():
+def main(database: str, start_year, end_year, pairwise_override=None, sigma_override=None):
 
-    # load the data
-    # data_for_diversity = read_csv(INPUT_DIR + 'sci_pathways.csv')
+    """
+    1. Get pairwise root-mean-square (RMS) distances for the scenario ensemble. Needed
+    to perform the diversity weighting process. 
+
+    """
+    # check for pairwise file first
+    if os.path.exists(OUTPUT_DIR + f'pairwise_rms_distances_{database}.csv') and pairwise_override is None:
+        print(f"Pairwise RMS distances file found for database {database}. Skipping calculation.")
+    else:
+        print(f"Calculating pairwise RMS distances for database {database}...")
+        calculate_pairwise_rms_distances(data_for_diversity, TIER_0_VARIABLES, database, 
+        start_year=start_year, end_year=end_year)
+
+    """
+    2. Calculate sigma values for each variable and determine appropriate sigma
+    for greatest diversity.
+
+    """
+    # check sigma file exists first
+    if os.path.exists(OUTPUT_DIR + f'sigma_values_{database}.csv') and sigma_override is None:
+        print(f"Sigma values file found for database {database}. Skipping calculation.")
+    else:
+        print(f"Calculating sigma values for database {database}...")
+        calculate_sigma_SSP_RCP(ar6_tier_0_data, SSP_SCENARIOS, TIER_0_VARIABLES)
+
     
+
+    
+
+
+
+
     """
     Run the sigma calculation for the AR6 pathways.
     """
     
-    ar6_tier_0_data = read_csv(INPUT_DIR + 'ar6_pathways_tier0.csv')
+    # ar6_tier_0_data = read_csv(INPUT_DIR + 'ar6_pathways_tier0.csv')
     
 
 
     # sigma_values = calculate_sigma_SSP_RCP(ar6_tier_0_data, SSP_SCENARIOS, TIER_0_VARIABLES)
     # sigma_values.to_csv(OUTPUT_DIR + 'sigma_value_0.00_1.00.csv', index=False)
     
-    # # calculate_pairwise_rms_distances(data_for_diversity, TIER_0_VARIABLES, 'sci', start_year=2020, end_year=2100)
 
     # sci_pathways = data_download_sub(TIER_0_VARIABLES, '*', '*', '*', 'World', 2100, database='sci')
     # sci_pathways.to_csv(INPUT_DIR + 'sci_pathways_tier0_CCS.csv', index=False)
@@ -74,8 +102,6 @@ def main():
     median_trajectory = melted_data.groupby('Year')['Value'].median().reset_index()
     median_trajectory.to_csv(OUTPUT_DIR + 'price_carbon_median_data.csv', index=False)
 
-
-
     # for category in variable_data['Category'].unique():
     #     print(f"Calculating correlation for category: {category}")
     #     category_data = variable_data[variable_data['Category'] == category]
@@ -108,6 +134,98 @@ def main():
     #                                     ar6_tier_0_data,
     #                                     meta_data=meta,
     #                                     category_groupings=[['C1','C2','C3','C4','C5','C6']])
+
+
+# Function that calculates pairwise RMS distances for each variable in the data
+def calculate_pairwise_rms_distances(data, variables, database, start_year=2020, end_year=2100):
+    """
+    Function that returns a DataFrame with pairwise RMS distances for each variable, for each
+    pair of scenarios in the database.
+
+    Inputs:
+    data (DataFrame): The scenario data containing the tier 0 variable data
+    variables (list): List of variables to calculate pairwise RMS distances for.
+    database (str): The database to use for the analysis. If 'sci', it uses the Scenario Compass database.
+    start_year (int): The starting year for the analysis. Default is 2020.
+    end_year (int): The ending year for the analysis. Default is 2100.
+    
+    Returns:
+    DataFrame: A DataFrame with pairwise RMS distances for each variable.
+
+    NOTE: At this point, the weights are not inverted. High weighting at this point 
+    means the scenario is more similar to the others, and thus less diverse.
+
+    """
+    # perform initial checks
+    if database not in DATABASES:
+        raise ValueError(f"Database '{database}' is not supported. Choose from {DATABASES}.")
+
+    # Ensure the data is a DataFrame
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("Input data must be a pandas DataFrame.")
+    
+    # Check if the required columns are present
+    required_columns = ['Scenario', 'Model', 'Region', 'Unit', 'Variable']
+    if not all(col in data.columns for col in required_columns):
+        raise ValueError(f"Input data must contain the following columns: {required_columns}")
+    
+    if database == 'sci':
+        # switch the variable 'Carbon Sequestration|CCS' to 'Carbon Capture'
+        if 'Carbon Sequestration|CCS' in variables:
+            variables = [var.replace('Carbon Sequestration|CCS', 'Carbon Capture') for var in variables]
+    
+    # Check if the variables are in the data
+    if not all(var in data['Variable'].unique() for var in variables):
+        raise ValueError(f"Some variables {variables} are not present in the data. Available variables: {data['Variable'].unique()}")
+
+    results = []
+
+    # Filter once
+    meta_cols = ['Scenario', 'Model', 'Region', 'Unit', 'Variable']
+
+    # only keep year columns 2020-2100 at decadal intervals
+    select_years = [str(year) for year in range(start_year, end_year + 1, 10)]
+    non_empty_years = [year for year in select_years if year in data.columns]
+    filtered_data = data[meta_cols + non_empty_years].copy()
+
+    filtered_data = filtered_data[filtered_data['Variable'].isin(variables)]
+
+    for variable in tqdm(variables, desc="Computing pairwise RMS"):
+        
+        var_data = filtered_data[filtered_data['Variable'] == variable]
+        time_series_array = var_data[non_empty_years].values
+        meta_info = var_data[['Model', 'Scenario']].values
+
+        # Iterate over unique pairs
+        for (i, j) in combinations(range(len(time_series_array)), 2):
+            ts_i = time_series_array[i]
+            ts_j = time_series_array[j]
+
+            dist = rms(ts_i, ts_j)
+
+            results.append({
+                'Variable': variable,
+                'Model_1': meta_info[i][0],
+                'Scenario_1': meta_info[i][1],
+                'Model_2': meta_info[j][0],
+                'Scenario_2': meta_info[j][1],
+                'RMS_Distance': dist
+            })
+
+    # Build result DataFrame
+    pairwise_rms_df = pd.DataFrame(results)
+    print(pairwise_rms_df)
+
+    # Save the results to a CSV file
+    pairwise_rms_df.to_csv(OUTPUT_DIR + f'pairwise_rms_distances_{database}.csv', index=False)
+
+
+# returns rms difference between two time series
+def rms(i, j):
+    return np.sqrt(np.mean((i - j) ** 2))
+
+
+
 
 
 # function that performs sensitivity to reduced size of the database.
@@ -279,94 +397,6 @@ def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables):
     print(sigma_values)
     return sigma_values
 
-# Function that calculates pairwise RMS distances for each variable in the data
-def calculate_pairwise_rms_distances(data, variables, database, start_year=2020, end_year=2100):
-    """
-    Function that returns a DataFrame with pairwise RMS distances for each variable, for each
-    pair of scenarios in the database.
-
-    Inputs:
-    data (DataFrame): The scenario data containing the tier 0 variable data
-    variables (list): List of variables to calculate pairwise RMS distances for.
-    database (str): The database to use for the analysis. If 'sci', it uses the Scenario Compass database.
-    start_year (int): The starting year for the analysis. Default is 2020.
-    end_year (int): The ending year for the analysis. Default is 2100.
-    
-    Returns:
-    DataFrame: A DataFrame with pairwise RMS distances for each variable.
-
-    NOTE: At this point, the weights are not inverted. High weighting at this point 
-    means the scenario is more similar to the others, and thus less diverse.
-
-    """
-    # perform initial checks
-    if database not in DATABASES:
-        raise ValueError(f"Database '{database}' is not supported. Choose from {DATABASES}.")
-
-    # Ensure the data is a DataFrame
-    if not isinstance(data, pd.DataFrame):
-        raise TypeError("Input data must be a pandas DataFrame.")
-    
-    # Check if the required columns are present
-    required_columns = ['Scenario', 'Model', 'Region', 'Unit', 'Variable']
-    if not all(col in data.columns for col in required_columns):
-        raise ValueError(f"Input data must contain the following columns: {required_columns}")
-    
-    if database == 'sci':
-        # switch the variable 'Carbon Sequestration|CCS' to 'Carbon Capture'
-        if 'Carbon Sequestration|CCS' in variables:
-            variables = [var.replace('Carbon Sequestration|CCS', 'Carbon Capture') for var in variables]
-    
-    # Check if the variables are in the data
-    if not all(var in data['Variable'].unique() for var in variables):
-        raise ValueError(f"Some variables {variables} are not present in the data. Available variables: {data['Variable'].unique()}")
-
-
-    results = []
-
-    # Filter once
-    meta_cols = ['Scenario', 'Model', 'Region', 'Unit', 'Variable']
-
-    # only keep year columns 2020-2100 at decadal intervals
-    select_years = [str(year) for year in range(start_year, end_year + 1, 10)]
-    non_empty_years = [year for year in select_years if year in data.columns]
-    filtered_data = data[meta_cols + non_empty_years].copy()
-
-    filtered_data = filtered_data[filtered_data['Variable'].isin(variables)]
-
-    for variable in tqdm(variables, desc="Computing pairwise RMS"):
-        
-        var_data = filtered_data[filtered_data['Variable'] == variable]
-        time_series_array = var_data[non_empty_years].values
-        meta_info = var_data[['Model', 'Scenario']].values
-
-        # Iterate over unique pairs
-        for (i, j) in combinations(range(len(time_series_array)), 2):
-            ts_i = time_series_array[i]
-            ts_j = time_series_array[j]
-
-            dist = rms(ts_i, ts_j)
-
-            results.append({
-                'Variable': variable,
-                'Model_1': meta_info[i][0],
-                'Scenario_1': meta_info[i][1],
-                'Model_2': meta_info[j][0],
-                'Scenario_2': meta_info[j][1],
-                'RMS_Distance': dist
-            })
-
-    # Build result DataFrame
-    pairwise_rms_df = pd.DataFrame(results)
-    print(pairwise_rms_df)
-
-    # Save the results to a CSV file
-    pairwise_rms_df.to_csv(OUTPUT_DIR + f'pairwise_rms_distances_{database}.csv', index=False)
-
-
-# returns rms difference between two time series
-def rms(i, j):
-    return np.sqrt(np.mean((i - j) ** 2))
 
 
 # Function that reweights the scenarios based on the pairwise RMS distances and the sigma input
@@ -651,8 +681,6 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
 
     # Save the stats DataFrame to a CSV file
     stats.to_csv(OUTPUT_DIR + f'sigma_greatest_diversity_{database}.csv', index=False)
-
-
 
 
 # Determine variable weights based on their correlation with each other
