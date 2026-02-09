@@ -1,11 +1,13 @@
-inputs/
+inputs/*
 revisions/
-outputs/
+outputs/*
 sci/
 manuscript/
 src/plotting.py
-src/main.py
 git
+
+!inputs/.gitkeep
+!outputs/.gitkeep
 
 # macOS
 .DS_Store

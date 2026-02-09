@@ -1,5 +1,7 @@
-import diversity
-
+from scenario_reweighting.diversity import main as diversity_main
+# import scenario_reweighting.quality 
+import scenario_reweighting.utils.file_parser
+import scenario_reweighting.constants
 
 
 def main():
@@ -9,7 +11,5 @@ def main():
     
     """
     
-    
-    
-    diversity.main(database='AR6', start_year=2020, end_year=2100)
+    diversity_main(database='AR6', start_year=2020, end_year=2100)
 

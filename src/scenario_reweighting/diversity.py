@@ -6,10 +6,10 @@ import copy
 import os
 import json
 from tqdm import tqdm
-from constants import *
+from scenario_reweighting.constants import *
 from itertools import combinations
-from utils.file_parser import read_csv
-from utils.utils import add_meta_cols, data_download_sub
+from scenario_reweighting.utils.file_parser import read_csv
+from scenario_reweighting.utils.utils import add_meta_cols, data_download_sub
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
 from sklearn.metrics import silhouette_score
