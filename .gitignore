@@ -7,5 +7,12 @@ src/plotting.py
 src/main.py
 git
 
+# macOS
+.DS_Store
 
+# Python
+__pycache__/
+*.py[cod]
 
+# IDE
+.vscode/
