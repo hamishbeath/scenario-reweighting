@@ -10,13 +10,11 @@ import numpy as np
 # DATA_DIR = "data/"
 OUTPUT_DIR = "outputs/"
 INPUT_DIR = "inputs/"
-DIVERSITY_OUTPUT_DIR = OUTPUT_DIR + "diversity_weights/"
-DIV_SENSITIVITY_OUTPUT_DIR = DIVERSITY_OUTPUT_DIR + "sensitivity/"
+DIVERSITY_DIR = OUTPUT_DIR + "diversity/"
+DIV_SENSITIVITY_OUTPUT_DIR = DIVERSITY_DIR + "sensitivity/"
 # PROCESSED_DIR = DATA_DIR + "processed/"
 # DATABASE_DIR = "database/"
-# LOG_FILE = "logs/app.log"
 
-# File Names/Paths
 
 # IAM Data constants
 CATEGORIES_ALL = ['C1', 'C2', 'C3', 'C4', 'C5','C6', 'C7', 'C8']
@@ -488,7 +486,6 @@ CORREL_ADJUSTED_WEIGHTS_FLAT_HC = {
     }
 }
 
-
 VARIABLE_INFO_NO_EMISSIONS = {
     'Emissions|CH4': {
         'group': 'Emissions',
@@ -601,7 +598,9 @@ CORREL_ADJUSTED_WEIGHTS_FLAT = {'Carbon Sequestration|CCS': 0.06350000662461833,
 #                            'Primary Energy|Oil': 0.125
 
 SIGMAS_SCI = ['0.0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0']
-SIGMAS_AR6 = ['0.00', '0.10', '0.20', '0.30', '0.40', '0.50', '0.60', '0.70', '0.80', '0.90', '1.00']
+# SIGMAS_AR6 = ['0.00', '0.10', '0.20', '0.30', '0.40', '0.50', '0.60', '0.70', '0.80', '0.90', '1.00']
+SIGMAS_AR6 = ['log_below_1', 'log_below_2', 'log_below_3', 'log_below_4', 'log_below_5', 'log_below_6', 'min', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', 'max']
+SIGMA_DEFAULT_AR6 = '0.2'
 
 MODES_COLOURMAPS = {
     'Project_study': {
@@ -814,9 +813,4 @@ VETTING_CRITERIA = {'CO2 Total':{'Variables':['Emissions|CO2'],
 
 VETTING_VARS = ['Emissions|CO2', 'Emissions|CO2|Energy and Industrial Processes', 'Emissions|CH4', 'Primary Energy',
                 'Secondary Energy|Electricity|Nuclear', 'Secondary Energy|Wind', 'Secondary Energy|Solar']
-
-# Error Messages
-ERROR_FILE_NOT_FOUND = "The requested file could not be found."
-ERROR_INVALID_INPUT = "The input provided is invalid."
-
 

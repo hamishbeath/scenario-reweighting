@@ -6,16 +6,17 @@ import copy
 import os
 import json
 from tqdm import tqdm
-from scenario_reweighting.constants import *
+from constants import *
 from itertools import combinations
-from scenario_reweighting.utils.file_parser import read_csv
-from scenario_reweighting.utils.utils import add_meta_cols, data_download_sub
+from utils.file_parser import read_csv
+from utils.utils import add_meta_cols, data_download_sub
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
 from sklearn.metrics import silhouette_score
 
 
-def main(database: str, start_year, end_year, pairwise_override=None, sigma_override=None):
+def main(database: str, start_year, end_year, data_for_diversity, default_sigma=False,
+         pairwise_override=None, sigma_override=None, specify_sigma=None):
 
     """
     1. Get pairwise root-mean-square (RMS) distances for the scenario ensemble. Needed
@@ -31,8 +32,7 @@ def main(database: str, start_year, end_year, pairwise_override=None, sigma_over
         start_year=start_year, end_year=end_year)
 
     """
-    2. Calculate sigma values for each variable and determine appropriate sigma
-    for greatest diversity.
+    2. Calculate sigma values for each variable 
 
     """
     # check sigma file exists first
@@ -40,41 +40,73 @@ def main(database: str, start_year, end_year, pairwise_override=None, sigma_over
         print(f"Sigma values file found for database {database}. Skipping calculation.")
     else:
         print(f"Calculating sigma values for database {database}...")
-        calculate_sigma_SSP_RCP(ar6_tier_0_data, SSP_SCENARIOS, TIER_0_VARIABLES)
+        calculate_sigma_SSP_RCP(data_for_diversity, SSP_SCENARIOS, TIER_0_VARIABLES)
 
+    sigmas_df = read_csv(DIVERSITY_DIR + f'sigma_values_{database}.csv')
+
+    if default_sigma:
+        sigma = DEFAULT_SIGMA
+    if specify_sigma is not None:
+        if not isinstance(specify_sigma, str):
+            try:
+                specify_sigma = str(float(specify_sigma))
+            except ValueError:
+                raise ValueError("Specified sigma value must be a string or a float \n"
+                                 "that can be converted to a string.")
+        sigma = specify_sigma
     
-
-    
-
-
-
+    # elif not default_sigma and specify_sigma is None:
 
     """
-    Run the sigma calculation for the AR6 pathways.
+    3a. Calculate variable weights based on default sigma value.
+
     """
+    # check if variable weights file exists first
+    if default_sigma or specify_sigma is not None:
+        if os.path.exists(OUTPUT_DIR + f'variable_weights_{database}_{sigma}_sigma.csv'):
+            print(f"Variable weights file found for database {database} with default sigma. Skipping calculation.")
+        else:
+            pairwise_rms_df = read_csv(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv')
+            sigma_values = sigma_file[sigma].to_dict()
+            calculate_variable_weights(pairwise_rms_df, sigma_values, database, sigma + '_sigma', TIER_0_VARIABLES)
+    
+    """
+    3b. Calculate variable weights based on range of sigma values to understand 
+    sensitivity of weighting effects to sigma input + select sigma value that provides
+    greatest diversity for the database.
+
+    """
+
+
+
+
+    # # to do: complete section where user can run sensitivity for sigma
+    # if not default_sigma:
+    #     print("Calculating sigma values to use for weighting...")
+    #     sigma_df = read_csv(OUTPUT_DIR + f'sigma_values_{database}.csv')
+    #     sigma_values = sigma_df.head().to_dict(orient='list')
+    #     print(sigma_values)
+        
+    #     try:
+    #         sigma_stats = determine_sigma_greatest_diversity(database, sigma_values, TIER_0_VARIABLES)
+    #         sigma = max(sigma_stats.groupby('Sigma')['IQR'].mean().reset_index())['Sigma']
+    #         print(f"Sigma value of {sigma} found to provide greatest diversity for database {database}.")
+    #     except FileNotFoundError:
+    #         print(NO_SIGMA_SENSITIVITY_DATA)
+    #         sigma = DEFAULT_SIGMA
+    # else:
+    #     sigma = DEFAULT_SIGMA
+
+
+
     
     # ar6_tier_0_data = read_csv(INPUT_DIR + 'ar6_pathways_tier0.csv')
-    
-
-
     # sigma_values = calculate_sigma_SSP_RCP(ar6_tier_0_data, SSP_SCENARIOS, TIER_0_VARIABLES)
     # sigma_values.to_csv(OUTPUT_DIR + 'sigma_value_0.00_1.00.csv', index=False)
-    
-
     # sci_pathways = data_download_sub(TIER_0_VARIABLES, '*', '*', '*', 'World', 2100, database='sci')
     # sci_pathways.to_csv(INPUT_DIR + 'sci_pathways_tier0_CCS.csv', index=False)
 
-    """
-    Run the variable weights calculation 
-    """
-    # pairwise_rms_ar6 = read_csv(OUTPUT_DIR + 'pairwise_rms_distances_ar6.csv')
-    # sigma_values = read_csv(OUTPUT_DIR + 'sigma_value_ar6.csv')
-    # sigma_values = sigma_values.set_index('Variable')
 
-    # sigmas = ['log_below_1', 'log_below_2', 'log_below_3', 'log_below_4', 'log_below_5', 'log_below_6', 'min', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', 'max']
-    # determine_sigma_greatest_diversity('ar6', sigmas, TIER_0_VARIABLES)    
-    # #     print(f"Variable weights calculated for sigma {sigma_string}")
-    # calculate_range_variable_weights(pairwise_rms_ar6, sigma_values, 'ar6', variables=TIER_0_VARIABLES, sigmas=sigmas)
 
 
     """
@@ -223,9 +255,6 @@ def calculate_pairwise_rms_distances(data, variables, database, start_year=2020,
 # returns rms difference between two time series
 def rms(i, j):
     return np.sqrt(np.mean((i - j) ** 2))
-
-
-
 
 
 # function that performs sensitivity to reduced size of the database.
@@ -395,8 +424,9 @@ def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables):
 
     # Print results
     print(sigma_values)
+    sigma_values.to_csv(OUTPUT_DIR + f'sigma_values_{database}.csv', index=False)
     return sigma_values
-
+    
 
 
 # Function that reweights the scenarios based on the pairwise RMS distances and the sigma input
@@ -634,7 +664,6 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
     for each sigma value.
 
     """
-
     stats = pd.DataFrame(columns=['Variable', 'Sigma', 'IQR', 'EFSS'])
 
     # Loop through each sigma value
@@ -681,6 +710,7 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
 
     # Save the stats DataFrame to a CSV file
     stats.to_csv(OUTPUT_DIR + f'sigma_greatest_diversity_{database}.csv', index=False)
+    return stats
 
 
 # Determine variable weights based on their correlation with each other
