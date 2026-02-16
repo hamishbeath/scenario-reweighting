@@ -157,7 +157,7 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
         else:
             print(f'Calculating composite weights for database {database} with {sigma} sigma...\n')
             calculate_composite_weight(scenario_variable_weights, data_for_diversity, 
-                                       f'{sigma}_sigma', variable_info=VARIABLE_INFO if database == 'ar6' else VARIABLE_INFO_SCI)
+                                       f'{sigma}_sigma', variable_info=variable_weights)
 
     else:
         print(f"Variable weights file not found for {database} with {sigma} sigma.")

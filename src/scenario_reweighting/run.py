@@ -56,7 +56,7 @@ def check_io():
         print(SCENARIO_DATA_NOT_FOUND)
         sys.exit(1)
 
-    # return inputs_dir, outputs_dir
+
 
 
 
