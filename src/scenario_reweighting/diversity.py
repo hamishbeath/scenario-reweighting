@@ -7,6 +7,7 @@ import os
 import json
 from tqdm import tqdm
 from constants import *
+from messages import *
 from itertools import combinations
 from utils.file_parser import read_csv
 from utils.utils import add_meta_cols, data_download_sub
@@ -16,7 +17,8 @@ from sklearn.metrics import silhouette_score
 
 
 def main(database: str, start_year, end_year, data_for_diversity, default_sigma=False,
-         pairwise_override=False, sigma_override=None, specify_sigma=None):
+         pairwise_override=False, sigma_override=False, sensitivity_override=False, 
+         specify_sigma=None, custom_vars=None):
 
     """
     Parameters:
@@ -34,9 +36,11 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
     -   sigma_override (bool): Whether to override the sigma values file if it already
         exists. Default is False, meaning it will use the existing file as long as it 
         exists.
-    -   specify_sigma (str or float): A specific sigma value to use for the analysis. 
+    -   specify_sigma (str or float): A specific sigma value to use for the analysis.
+    -   custom_vars (list): A list of custom variables to use for the analysis. 
+        If None, it will use the default tier 0 variables for the specified database.
 
-    Returns:
+    Returns: files needed for complete diversity weighting process.
  
     """
 
@@ -45,12 +49,16 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
     to perform the diversity weighting process. 
 
     """
+    variables = custom_vars if custom_vars is not None else TIER_0_VARIABLES_AR6 if database == 'ar6' else TIER_0_VARIABLES_SCI
+    
     # check for pairwise file first
-    if os.path.exists(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv') and pairwise_override is None:
-        print(f"Pairwise RMS distances file found for database {database}. Skipping calculation.")
+    if os.path.exists(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv') and pairwise_override is False:
+        print(f"Pairwise RMS distances file found for database {database}. \n"
+              "Skipping calculation.\n")
+
     else:
-        print(f"Calculating pairwise RMS distances for database {database}...")
-        calculate_pairwise_rms_distances(data_for_diversity, TIER_0_VARIABLES, database, 
+        print(f"Calculating pairwise RMS distances for database {database}...\n")
+        calculate_pairwise_rms_distances(data_for_diversity, variables, database, 
         start_year=start_year, end_year=end_year)
 
     """
@@ -58,16 +66,18 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
 
     """
     # check sigma file exists first
-    if os.path.exists(OUTPUT_DIR + f'sigma_values_{database}.csv') and sigma_override is None:
-        print(f"Sigma values file found for database {database}. Skipping calculation.")
+    if os.path.exists(DIVERSITY_DIR + f'sigma_values_{database}.csv') and sigma_override is False:
+        print(f"Sigma values file found for database {database}. Skipping calculation.\n")
     else:
-        print(f"Calculating sigma values for database {database}...")
-        calculate_sigma_SSP_RCP(data_for_diversity, SSP_SCENARIOS, TIER_0_VARIABLES)
+        print(f"Calculating sigma values for database {database}...\n")
+        calculate_sigma_SSP_RCP(data_for_diversity, SSP_SCENARIOS, variables, 
+                            database)
 
     sigmas_df = read_csv(DIVERSITY_DIR + f'sigma_values_{database}.csv')
+    sigmas_df = sigmas_df.set_index('Variable')
 
     if default_sigma:
-        sigma = DEFAULT_SIGMA
+        sigma = SIGMA_DEFAULT_AR6 if database == 'ar6' else SIGMA_DEFAULT_SCI
     if specify_sigma is not None:
         if not isinstance(specify_sigma, str):
             try:
@@ -83,13 +93,14 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
     """
     # check if variable weights file exists first
     if default_sigma or specify_sigma is not None:
-        if os.path.exists(OUTPUT_DIR + f'variable_weights_{database}_{sigma}_sigma.csv'):
+        if os.path.exists(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma.csv'):
             print(f"Variable weights file found for {database}"
                   f" with {sigma} sigma. Skipping calculation.")
         else:
+            print(f'Calculating variable weights for database {database} with {sigma} sigma...\n')
             pairwise_rms_df = read_csv(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv')
-            sigma_values = sigma_file[sigma].to_dict()
-            calculate_variable_weights(pairwise_rms_df, sigma_values, database, sigma + '_sigma', TIER_0_VARIABLES)
+            sigma_values = sigmas_df[sigma].to_dict()
+            calculate_variable_weights(pairwise_rms_df, sigma_values, database, sigma + '_sigma', variables)
     
     """
     3b. Calculate variable weights based on range of sigma values to understand 
@@ -101,20 +112,35 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
     
     if not default_sigma and specify_sigma is None:
         print('Calculating variable weights for range of sigma values to understand '
-              'sensitivity of weighting effects to sigma input...')
+              'sensitivity of weighting effects to sigma input...\n \n'
+              'This process can take some time.') 
+
         pairwise_rms_df = read_csv(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv')
+        if database == 'ar6':
+            sigmas = SIGMAS_AR6
+        if database == 'sci':
+            sigmas = SIGMAS_SCI
+        else:
+            sigmas == None
         calculate_range_variable_weights(pairwise_rms_df, sigmas_df, database, 
-                                        TIER_0_VARIABLES, sigmas=SIGMAS_AR6)
+                                        variables, sigmas=sigmas, sensitivity_override=sensitivity_override)
         print('Establishing sigma value that provides greatest diversity '
               'for the database...')
+        
         try:
-            sigma_stats = determine_sigma_greatest_diversity(database, sigma_values, TIER_0_VARIABLES)
-            sigma = max(sigma_stats.groupby('Sigma')['IQR'].mean().reset_index())['Sigma']
-            print(f"Sigma value of {sigma} found to provide greatest diversity for database {database}.")
+            if os.path.exists(DIVERSITY_DIR + f'sigma_greatest_diversity_{database}.csv'):
+                print(f"Sigma greatest diversity stats file found for database {database}. Skipping calculation.")
+                sigma_stats = read_csv(DIVERSITY_DIR + f'sigma_greatest_diversity_{database}.csv')
+            else:
+                sigma_stats = determine_sigma_greatest_diversity(database, sigmas, variables)
+            sigma_group = (sigma_stats.groupby('Sigma')['IQR'].median().reset_index())
+            sigma = sigma_group.loc[sigma_group['IQR'].idxmax(), 'Sigma']
+            print(f"Sigma value of {sigma} gives highest median IQR for weights across variables {database} database.")
         except FileNotFoundError:
             print(NO_SIGMA_SENSITIVITY_DATA)
             print('Reverting to default sigma value for diversity weighting.')
-            sigma = DEFAULT_SIGMA
+            sigma = SIGMA_DEFAULT_AR6 if database == 'ar6' else SIGMA_DEFAULT_SCI
+
 
     """
     4. Calculate Composite diversity weights calculation. This uses the variable weights
@@ -128,14 +154,18 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
         if os.path.exists(DIVERSITY_DIR + f'composite_weights_{database}_{sigma}_sigma.csv'):
             print(f"Composite weights file found for {database}"
                   f" with {sigma} sigma. Skipping calculation.")
-    
-    
+        else:
+            print(f'Calculating composite weights for database {database} with {sigma} sigma...\n')
+            calculate_composite_weight(scenario_variable_weights, data_for_diversity, 
+                                       f'{sigma}_sigma', variable_info=VARIABLE_INFO if database == 'ar6' else VARIABLE_INFO_SCI)
+
     else:
         print(f"Variable weights file not found for {database} with {sigma} sigma.")
         print('Please ensure variable weights file is in place or run the variable'
               ' weight calculation step with the desired sigma value.')
     
-    print('Diversity weighting has finished running')
+    print('Diversity weighting has finished running. Please check the outputs/diversity/'
+          ' directory for the variable and composite weights files.')
 
 
 
@@ -217,10 +247,10 @@ def calculate_pairwise_rms_distances(data, variables, database, start_year=2020,
 
     # Build result DataFrame
     pairwise_rms_df = pd.DataFrame(results)
-    print(pairwise_rms_df)
+    # print(pairwise_rms_df)
 
     # Save the results to a CSV file
-    pairwise_rms_df.to_csv(OUTPUT_DIR + f'pairwise_rms_distances_{database}.csv', index=False)
+    pairwise_rms_df.to_csv(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv', index=False)
 
 
 # returns rms difference between two time series
@@ -282,20 +312,23 @@ def run_database_segment_sensitivity(database_pairwise : pd.DataFrame,
 
 
 
-def calculate_range_variable_weights(database_pairwise, sigma_file, database, variables=TIER_0_VARIABLES,sigmas=None):
+def calculate_range_variable_weights(database_pairwise, sigma_file, database, variables, sensitivity_override=False, sigmas=None):
 
     if sigmas is None:
         sigmas = ['min', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', 'max']
-    else:
-        sigmas = sigmas
     for sigma in sigmas:
-        sigma_values = sigma_file[sigma].to_dict()
-        calculate_variable_weights(database_pairwise, sigma_values, database, sigma + '_sigma', variables)
-        print(f"Variable weights calculated for sigma {sigma}")
+        if os.path.exists(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma.csv') and not sensitivity_override:
+            print(f"Variable weights file found for {database} with {sigma} sigma. Skipping calculation.")
+            continue
+        else:
+            sigma_values = sigma_file[sigma].to_dict()
+            print(f"Calculating variable weights for {sigma} sigma.\n")
+            calculate_variable_weights(database_pairwise, sigma_values, database, sigma + '_sigma', variables)
+            print(f"Variable weights calculated for sigma {sigma}")
 
 
 # Function to Calculate sigma values
-def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables):
+def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables, database):
     """
     Calculate sigma values for each variable (min, median, max) - export to csv.
     
@@ -354,7 +387,7 @@ def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables):
             if not pairwise_rms_dists:
                 continue
 
-        quantiles_to_run = 0.00, 1.00
+        quantiles_to_run = np.arange(0.00, 1.01, 0.1)
 
         # Calculate summary statistics
         # quantiles = np.quantile(pairwise_rms_dists, QUANTILE_LEVELS)
@@ -391,9 +424,7 @@ def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables):
     # sigma_values.columns = ['Variable', 'min', '5th', 'q1', 'median', 'q3', '95th', 'max']
     sigma_values = sigma_values.rename(columns={'index': 'Variable'})
 
-    # Print results
-    print(sigma_values)
-    sigma_values.to_csv(OUTPUT_DIR + f'sigma_values_{database}.csv', index=False)
+    sigma_values.to_csv(DIVERSITY_DIR + f'sigma_values_{database}.csv', index=False)
     return sigma_values
     
 
@@ -463,7 +494,7 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id,
     variable_weights_df['Weight'] = variable_weights_df.groupby('Variable')['Raw Weight'].transform(lambda x: x / x.sum())
 
     # Save output
-    variable_weights_df.to_csv(DIVERSITY_OUTPUT_DIR + f'{sensitivity}variable_weights_{database}_{output_id}.csv', index=False)
+    variable_weights_df.to_csv(DIVERSITY_DIR + f'variable_weights_{database}_{output_id}.csv', index=False)
 
     if return_df:
         return variable_weights_df
@@ -471,7 +502,7 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id,
 
 # combines the weights from each of the variables using the group and sub-group weights
 def calculate_composite_weight(weighting_data_file, original_scenario_data, output_id, variable_info=VARIABLE_INFO, 
-                               flat_weights=None, output_dir=DIVERSITY_OUTPUT_DIR):
+                               flat_weights=None, output_dir=DIVERSITY_DIR):
 
     """
     Function that combines the weights from each of the variables using the group and sub-group weights. Allows for underreporting
@@ -639,7 +670,7 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
     for sigma in sigma_values:
 
         # open the relevant pairwise RMS distances file
-        sigma_df = read_csv(OUTPUT_DIR + f"variable_weights_{database}_{sigma}_sigma.csv")
+        sigma_df = read_csv(DIVERSITY_DIR + f"variable_weights_{database}_{sigma}_sigma.csv")
         variables = sigma_df['Variable'].unique().tolist()
 
         # sigma_df['Weight'] = -sigma_df['Weight']
@@ -660,8 +691,6 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
             # get the IQR of the weights
             iqrs.append(variable_df['Weight'].quantile(0.75) - variable_df['Weight'].quantile(0.25))
                         
-            # calculate the effective sample size
-            effective_sample_size.append(1 / sum(variable_df['Weight']**2))
 
         # Calculate the mean IQR for the set
         mean_iqr = np.mean(iqrs) 
@@ -674,11 +703,10 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
             'Variable': variables,
             'Sigma': [sigma] * len(variables),
             'IQR': iqrs,
-            'EFSS': effective_sample_size + [mean_efss]
         })], ignore_index=True)
 
     # Save the stats DataFrame to a CSV file
-    stats.to_csv(OUTPUT_DIR + f'sigma_greatest_diversity_{database}.csv', index=False)
+    stats.to_csv(DIVERSITY_DIR + f'sigma_greatest_diversity_{database}.csv', index=False)
     return stats
 
 

@@ -1,7 +1,7 @@
 
 # import scenario_reweighting.quality 
 # import utils.file_parser
-import constants
+from constants import INPUT_DIR, DIVERSITY_DIR
 from diversity import main as diversity_main
 from messages import SCENARIO_DATA_NOT_FOUND
 from utils.file_parser import read_csv
@@ -17,17 +17,14 @@ def main():
     
     """
     print("Running pre flight checks")
-    inputs_dir, outputs_dir = check_io()
+    check_io()
 
     # read in data for diversity calculation
-    scenarios_data = read_csv(str(inputs_dir / SCENARIO_DATA_FILE))
+    scenarios_data = read_csv(INPUT_DIR + SCENARIO_DATA_FILE)
 
     # run diversity calculation sequentially
-    diversity_main(database='AR6', start_year=2020, end_year=2100, 
-    data_for_diversity=scenarios_data)
-
-
-    
+    diversity_main(database='ar6', start_year=2020, end_year=2100, 
+                    data_for_diversity=scenarios_data)
 
 
 # check for inputs and outputs
@@ -36,9 +33,9 @@ def check_io():
     inputs_dir = repo_root / "inputs"
     outputs_dir = repo_root / "outputs"
 
-    diversity_dir = inputs_dir / "diversity"
-    quality_dir = inputs_dir / "quality"
-    relevance_dir = inputs_dir / "relevance"
+    diversity_dir = outputs_dir / "diversity"
+    quality_dir = outputs_dir / "quality"
+    relevance_dir = outputs_dir / "relevance"
     
     print(f"Checking for inputs in {inputs_dir} and outputs in {outputs_dir}")
 

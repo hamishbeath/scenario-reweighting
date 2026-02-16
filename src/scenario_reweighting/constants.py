@@ -11,22 +11,16 @@ import numpy as np
 OUTPUT_DIR = "outputs/"
 INPUT_DIR = "inputs/"
 DIVERSITY_DIR = OUTPUT_DIR + "diversity/"
-DIV_SENSITIVITY_OUTPUT_DIR = DIVERSITY_DIR + "sensitivity/"
-# PROCESSED_DIR = DATA_DIR + "processed/"
-# DATABASE_DIR = "database/"
-
 
 # IAM Data constants
 CATEGORIES_ALL = ['C1', 'C2', 'C3', 'C4', 'C5','C6', 'C7', 'C8']
 CATEGORIES_DEFAULT = CATEGORIES_ALL[:2]
 CATEGORIES_15 =  ['C1', 'C1a_NZGHGs', 'C2']
 
-# GROUP_MODES = ['Model_family', 'Project', 'Tech_diffusion']
-
 GROUP_MODES = ['Model_family', 'Project']
 
 #Weighting constants
-TIER_0_VARIABLES = ['Emissions|CO2',
+TIER_0_VARIABLES_AR6 = ['Emissions|CO2',
                     'Emissions|N2O',
                     'Final Energy',
                     'Emissions|Sulfur',
@@ -56,7 +50,6 @@ TIER_0_VARIABLES_SCI = ['Emissions|CO2',
                     'Primary Energy|Biomass',
                     'GDP|PPP',
                     'Price|Carbon']
-
 
 VARIABLE_GROUPS = {
     'Emissions|CH4': 'Emissions', 
@@ -581,26 +574,10 @@ CORREL_ADJUSTED_WEIGHTS_FLAT = {'Carbon Sequestration|CCS': 0.06350000662461833,
                            'Primary Energy|Oil': 0.049695307108789395
 }
 
-# CORREL_ADJUSTED_WEIGHTS_FLAT_HC = {'Carbon Sequestration|CCS': 0.125, 
-#                            'Consumption': 0.125, 
-#                            'Emissions|CH4': 0, 
-#                            'Emissions|CO2': 0.125, 
-#                            'Emissions|N2O': 0.125, 
-#                            'Emissions|Sulfur': 0, 
-#                            'Final Energy': 0, 
-#                            'GDP|PPP': 0.125, 
-#                            'Price|Carbon': 0.125, 
-#                            'Primary Energy|Biomass': 0.0, 
-#                            'Primary Energy|Coal': 0.0, 
-#                            'Primary Energy|Gas': 0.0, 
-#                            'Primary Energy|Non-Biomass Renewables': 0.125, 
-#                            'Primary Energy|Nuclear': 0.125, 
-#                            'Primary Energy|Oil': 0.125
-
-SIGMAS_SCI = ['0.0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', '1.0']
-# SIGMAS_AR6 = ['0.00', '0.10', '0.20', '0.30', '0.40', '0.50', '0.60', '0.70', '0.80', '0.90', '1.00']
-SIGMAS_AR6 = ['log_below_1', 'log_below_2', 'log_below_3', 'log_below_4', 'log_below_5', 'log_below_6', 'min', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', 'max']
-SIGMA_DEFAULT_AR6 = '0.2'
+SIGMAS_SCI = ['0.0', '0.10', '0.20', '0.30', '0.40', '0.50', '0.60', '0.70', '0.80', '0.90', '1.00']
+SIGMAS_AR6 = ['log_below_1', 'log_below_2', 'log_below_3', 'log_below_4', 'log_below_5', 'log_below_6', '0.00', '0.10', '0.20', '0.30', '0.40', '0.50', '0.60', '0.70', '0.80', '0.90', '1.00']
+SIGMA_DEFAULT_AR6 = '0.20'
+SIGMA_DEFAULT_SCI = '0.20'
 
 MODES_COLOURMAPS = {
     'Project_study': {
@@ -667,10 +644,6 @@ MODES_COLOURMAPS = {
 }
 
 
-
-    
-
-
 # SSP Scenarios
 SSP_SCENARIOS = ssp_scenarios = [
     'SSP1-19', 'SSP1-26', 'SSP1-34', 'SSP1-45', 'SSP1-Baseline',
@@ -681,7 +654,6 @@ SSP_SCENARIOS = ssp_scenarios = [
 ]
 
 DATABASES = ['ar6', 'sci']  # Available databases
-
 
 QUANTILE_LEVELS = [0.05, 0.25, 0.5, 0.75, 0.95]  # Quantile levels for sigma calculations
 
