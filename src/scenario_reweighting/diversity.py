@@ -18,7 +18,7 @@ from sklearn.metrics import silhouette_score
 
 def main(database: str, start_year, end_year, data_for_diversity, default_sigma=False,
          pairwise_override=False, sigma_override=False, sensitivity_override=False, 
-         specify_sigma=None, custom_vars=None):
+         specify_sigma=None, custom_vars=None, variable_weights=None):
 
     """
     Parameters:
@@ -50,7 +50,9 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
 
     """
     variables = custom_vars if custom_vars is not None else TIER_0_VARIABLES_AR6 if database == 'ar6' else TIER_0_VARIABLES_SCI
-    
+    if variable_weights is None:
+        print(DEFAULT_VARS)
+    variable_weights = VARIABLE_INFO if database == 'ar6' else VARIABLE_INFO_SCI
     # check for pairwise file first
     if os.path.exists(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv') and pairwise_override is False:
         print(f"Pairwise RMS distances file found for database {database}. \n"

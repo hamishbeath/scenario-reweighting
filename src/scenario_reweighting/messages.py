@@ -9,3 +9,14 @@ NO_SIGMA_SENSITIVITY_DATA = (
     "No sigma sensitivity data found.\n\n"
     "Please ensure the sigma sensitivity data files are in place in outputs/ (see Readme).\n"
     "See instructions for running the sigma sensitivity analysis in the Readme.")
+
+DEFAULT_VARS = ("Using the default tier 0 variables for the database. To specify custom variables, "
+                "please provide a list of variable names in the 'custom_vars' argument of the diversity.main()"
+                "function.\n")
+
+DEFAULT_WEIGHTS = ("Using default variable weights based on expert judgement of importance for scenario diversity. "
+                    "To specify custom variable weights, please provide a dictionary of variable names and weights "
+                    "in the 'variable_weights' argument of the diversity.main() function.\n"
+                    "Description of this is given in the readme, and existing sets for AR6 can be found in constants.py.\n")
+
+

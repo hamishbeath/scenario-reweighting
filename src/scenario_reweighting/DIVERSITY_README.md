@@ -99,7 +99,7 @@ Calibrates sigma values by computing pairwise RMS distances **within** each SSP/
 
 ---
 
-### 3. Variable Weights
+### 3. Single Variable Weights
 
 #### `calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, variables, ...)`
 
@@ -221,6 +221,160 @@ Variables are organised into four groups, each with equal group weight (1/4):
 | **Mitigation** | CCS, Carbon Price |
 
 Within each group, subgroup weights reflect relative importance (e.g. CO₂ has weight 1/2 within Emissions, while CH₄, N₂O, and Sulfur each have 1/6). These are defined in `constants.py` via the `VARIABLE_INFO` dictionary.
+
+---
+
+## Customising Variable Weights
+
+The composite diversity weight for each scenario is built from a two-level hierarchy of **group weights** and **subgroup weights**. Users can control how much influence each variable has on the final diversity score by editing the `VARIABLE_INFO` dictionary in `constants.py`, or by passing a custom dictionary via the `variable_info` parameter of `calculate_composite_weight()`.
+
+### How `VARIABLE_INFO` works
+
+Each variable entry in the dictionary has three fields:
+
+```python
+'Emissions|CO2': {
+    'group': 'Emissions',       # which group the variable belongs to
+    'group_weight': 1/4,        # weight of the group in the composite score
+    'subgroup_weight': 1/2      # weight of this variable within its group
+}
+```
+
+The effective weight of a variable in the composite calculation is:
+
+$$w_v^{\text{effective}} = w_{\text{group}(v)} \times w_{\text{subgroup}(v)}$$
+
+**Rules to follow when setting weights:**
+
+1. **Group weights should sum to 1** across all groups. In the default configuration there are four groups, each weighted 1/4.
+2. **Subgroup weights should sum to 1 within each group.** For example, the Emissions group has CO₂ at 1/2 and CH₄, N₂O, Sulfur each at 1/6, totalling 1.
+3. Every variable used in the diversity analysis must have an entry in the dictionary.
+
+### Default weights
+
+The default `VARIABLE_INFO` gives equal weight to each group (1/4 each) and distributes subgroup weight to reflect relative importance:
+
+| Variable | Group | Group Weight | Subgroup Weight | Effective Weight |
+|---|---|---|---|---|
+| Emissions\|CO2 | Emissions | 1/4 | 1/2 | 1/8 |
+| Emissions\|CH4 | Emissions | 1/4 | 1/6 | 1/24 |
+| Emissions\|N2O | Emissions | 1/4 | 1/6 | 1/24 |
+| Emissions\|Sulfur | Emissions | 1/4 | 1/6 | 1/24 |
+| Primary Energy\|Biomass | Energy | 1/4 | 1/12 | 1/48 |
+| Primary Energy\|Coal | Energy | 1/4 | 1/12 | 1/48 |
+| Primary Energy\|Gas | Energy | 1/4 | 1/12 | 1/48 |
+| Primary Energy\|Non-Biomass Renewables | Energy | 1/4 | 1/12 | 1/48 |
+| Primary Energy\|Nuclear | Energy | 1/4 | 1/12 | 1/48 |
+| Primary Energy\|Oil | Energy | 1/4 | 1/12 | 1/48 |
+| Final Energy | Energy | 1/4 | 1/2 | 1/8 |
+| Consumption | Economy | 1/4 | 1/2 | 1/8 |
+| GDP\|PPP | Economy | 1/4 | 1/2 | 1/8 |
+| Carbon Sequestration\|CCS | Mitigation | 1/4 | 1/2 | 1/8 |
+| Price\|Carbon | Mitigation | 1/4 | 1/2 | 1/8 |
+
+### Pre-defined alternative weight sets
+
+Several alternative configurations are already defined in `constants.py`. These can be passed directly to `calculate_composite_weight()` via its `variable_info` parameter:
+
+| Constant name | Description |
+|---|---|
+| `VARIABLE_INFO` | Default balanced weights across all four groups (1/4 each). |
+| `VARIABLE_INFO_SCI` | Adapted for the Scenario Compass database (excludes CCS). |
+| `VARIABLE_INFO_EMISSIONS_ONLY` | Full weight on Emissions group; all other groups set to 0. |
+| `VARIABLE_INFO_ENERGY` | Full weight on Energy group; all other groups set to 0. |
+| `VARIABLE_INFO_NO_EMISSIONS` | Excludes Emissions group; redistributes weight to remaining groups (1/3 each). |
+| `CORREL_ADJUSTED_WEIGHTS_FLAT_HC` | Correlation-informed flat weights (group weight = 1, subgroup weights derived from inverse correlation analysis). |
+
+### Creating a custom weight set
+
+To define your own weighting scheme, create a new dictionary in `constants.py` (or inline in your script) following the same structure. For example, to weight Energy and Emissions equally while ignoring Economy and Mitigation:
+
+```python
+MY_CUSTOM_WEIGHTS = {
+    'Emissions|CO2': {
+        'group': 'Emissions',
+        'group_weight': 1/2,
+        'subgroup_weight': 1/2
+    },
+    'Emissions|CH4': {
+        'group': 'Emissions',
+        'group_weight': 1/2,
+        'subgroup_weight': 1/6
+    },
+    'Emissions|N2O': {
+        'group': 'Emissions',
+        'group_weight': 1/2,
+        'subgroup_weight': 1/6
+    },
+    'Emissions|Sulfur': {
+        'group': 'Emissions',
+        'group_weight': 1/2,
+        'subgroup_weight': 1/6
+    },
+    # Energy variables with group_weight = 1/2 ...
+    'Primary Energy|Coal': {
+        'group': 'Energy',
+        'group_weight': 1/2,
+        'subgroup_weight': 1/12
+    },
+    # ... (all other Energy variables)
+    # Economy and Mitigation variables with group_weight = 0
+    'Consumption': {
+        'group': 'Economy',
+        'group_weight': 0,
+        'subgroup_weight': 1/2
+    },
+    # ... (all remaining variables)
+}
+```
+
+Then pass it when computing composite weights:
+
+```python
+calculate_composite_weight(
+    scenario_variable_weights,
+    data_for_diversity,
+    output_id='my_custom_run',
+    variable_info=MY_CUSTOM_WEIGHTS
+)
+```
+
+### Using flat weights (bypassing group structure)
+
+If you want to assign a single weight directly to each variable without using the group/subgroup hierarchy, pass a dictionary via the `flat_weights` parameter of `calculate_composite_weight()`. When `flat_weights` is provided, the group and subgroup structure is ignored entirely.
+
+```python
+my_flat_weights = {
+    'Emissions|CO2': 0.15,
+    'Emissions|CH4': 0.05,
+    'Emissions|N2O': 0.05,
+    'Emissions|Sulfur': 0.05,
+    'Primary Energy|Biomass': 0.05,
+    'Primary Energy|Coal': 0.05,
+    'Primary Energy|Gas': 0.05,
+    'Primary Energy|Non-Biomass Renewables': 0.07,
+    'Primary Energy|Nuclear': 0.07,
+    'Primary Energy|Oil': 0.05,
+    'Final Energy': 0.06,
+    'Consumption': 0.10,
+    'GDP|PPP': 0.10,
+    'Carbon Sequestration|CCS': 0.05,
+    'Price|Carbon': 0.05,
+}
+
+calculate_composite_weight(
+    scenario_variable_weights,
+    data_for_diversity,
+    output_id='flat_custom',
+    flat_weights=my_flat_weights
+)
+```
+
+A pre-defined flat weight set derived from correlation analysis is available as `CORREL_ADJUSTED_WEIGHTS_FLAT` in `constants.py`.
+
+### Handling missing variables
+
+If a scenario does not report all variables, the function `adjust_weights_for_missing_variables()` is called automatically. It removes the missing variables and redistributes the subgroup weights within each affected group so they still sum to 1. If an entire group is absent, the group weights for the remaining groups are recalculated. No user intervention is required.
 
 ### Weight Inversion
 
