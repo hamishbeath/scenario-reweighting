@@ -3,7 +3,7 @@ revisions/
 outputs/*
 sci/
 manuscript/
-src/plotting.py
+src/scenario_reweighting/plotting.py
 git
 
 !inputs/.gitkeep
