@@ -1,19 +1,17 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import wquantiles
 import copy
 import os
-import json
+import logging
 from tqdm import tqdm
 from constants import *
 from messages import *
 from itertools import combinations
 from utils.file_parser import read_csv
-from utils.utils import add_meta_cols, data_download_sub
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
-from sklearn.metrics import silhouette_score
+
+logger = logging.getLogger(__name__)
 
 
 def main(database: str, start_year, end_year, data_for_diversity, default_sigma=False,
@@ -51,15 +49,16 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
     """
     variables = custom_vars if custom_vars is not None else TIER_0_VARIABLES_AR6 if database == 'ar6' else TIER_0_VARIABLES_SCI
     if variable_weights is None:
-        print(DEFAULT_VARS)
-    variable_weights = VARIABLE_INFO if database == 'ar6' else VARIABLE_INFO_SCI
+        logger.info(DEFAULT_VARS)
+        variable_weights = VARIABLE_INFO if database == 'ar6' else VARIABLE_INFO_SCI
+    
     # check for pairwise file first
-    if os.path.exists(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv') and pairwise_override is False:
-        print(f"Pairwise RMS distances file found for database {database}. \n"
-              "Skipping calculation.\n")
+    if os.path.exists(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv') and not pairwise_override:
+        logger.info(f"Pairwise RMS distances file found for database {database}. "
+              "Skipping calculation.")
 
     else:
-        print(f"Calculating pairwise RMS distances for database {database}...\n")
+        logger.info(f"Calculating pairwise RMS distances for database {database}...")
         calculate_pairwise_rms_distances(data_for_diversity, variables, database, 
         start_year=start_year, end_year=end_year)
 
@@ -69,9 +68,9 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
     """
     # check sigma file exists first
     if os.path.exists(DIVERSITY_DIR + f'sigma_values_{database}.csv') and sigma_override is False:
-        print(f"Sigma values file found for database {database}. Skipping calculation.\n")
+        logger.info(f"Sigma values file found for database {database}. Skipping calculation.")
     else:
-        print(f"Calculating sigma values for database {database}...\n")
+        logger.info(f"Calculating sigma values for database {database}...")
         calculate_sigma_SSP_RCP(data_for_diversity, SSP_SCENARIOS, variables, 
                             database)
 
@@ -80,12 +79,12 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
 
     if default_sigma:
         sigma = SIGMA_DEFAULT_AR6 if database == 'ar6' else SIGMA_DEFAULT_SCI
-    if specify_sigma is not None:
+    elif specify_sigma is not None:
         if not isinstance(specify_sigma, str):
             try:
                 specify_sigma = str(float(specify_sigma))
             except ValueError:
-                raise ValueError("Specified sigma value must be a string or a float \n"
+                raise ValueError("Specified sigma value must be a string or a float "
                                  "that can be converted to a string.")
         sigma = specify_sigma
     
@@ -96,10 +95,10 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
     # check if variable weights file exists first
     if default_sigma or specify_sigma is not None:
         if os.path.exists(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma.csv'):
-            print(f"Variable weights file found for {database}"
+            logger.info(f"Variable weights file found for {database}"
                   f" with {sigma} sigma. Skipping calculation.")
         else:
-            print(f'Calculating variable weights for database {database} with {sigma} sigma...\n')
+            logger.info(f'Calculating variable weights for database {database} with {sigma} sigma...')
             pairwise_rms_df = read_csv(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv')
             sigma_values = sigmas_df[sigma].to_dict()
             calculate_variable_weights(pairwise_rms_df, sigma_values, database, sigma + '_sigma', variables)
@@ -109,38 +108,36 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
     sensitivity of weighting effects to sigma input + select sigma value that provides
     greatest diversity for the database.
 
-    """
-    # to do item: sort it so can accept specified range of sigmas to run through.
-    
+    """    
     if not default_sigma and specify_sigma is None:
-        print('Calculating variable weights for range of sigma values to understand '
-              'sensitivity of weighting effects to sigma input...\n \n'
+        logger.info('Calculating variable weights for range of sigma values to understand '
+              'sensitivity of weighting effects to sigma input. '
               'This process can take some time.') 
 
         pairwise_rms_df = read_csv(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv')
         if database == 'ar6':
             sigmas = SIGMAS_AR6
-        if database == 'sci':
+        elif database == 'sci':
             sigmas = SIGMAS_SCI
         else:
-            sigmas == None
+            sigmas = None
         calculate_range_variable_weights(pairwise_rms_df, sigmas_df, database, 
                                         variables, sigmas=sigmas, sensitivity_override=sensitivity_override)
-        print('Establishing sigma value that provides greatest diversity '
+        logger.info('Establishing sigma value that provides greatest diversity '
               'for the database...')
         
         try:
             if os.path.exists(DIVERSITY_DIR + f'sigma_greatest_diversity_{database}.csv'):
-                print(f"Sigma greatest diversity stats file found for database {database}. Skipping calculation.")
+                logger.info(f"Sigma greatest diversity stats file found for database {database}. Skipping calculation.")
                 sigma_stats = read_csv(DIVERSITY_DIR + f'sigma_greatest_diversity_{database}.csv')
             else:
                 sigma_stats = determine_sigma_greatest_diversity(database, sigmas, variables)
             sigma_group = (sigma_stats.groupby('Sigma')['IQR'].median().reset_index())
             sigma = sigma_group.loc[sigma_group['IQR'].idxmax(), 'Sigma']
-            print(f"Sigma value of {sigma} gives highest median IQR for weights across variables {database} database.")
+            logger.info(f"Sigma value of {sigma} gives highest median IQR for weights across variables {database} database.")
         except FileNotFoundError:
-            print(NO_SIGMA_SENSITIVITY_DATA)
-            print('Reverting to default sigma value for diversity weighting.')
+            logger.warning(NO_SIGMA_SENSITIVITY_DATA)
+            logger.warning('Reverting to default sigma value for diversity weighting.')
             sigma = SIGMA_DEFAULT_AR6 if database == 'ar6' else SIGMA_DEFAULT_SCI
 
 
@@ -150,29 +147,29 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
     
     """
     if os.path.exists(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma.csv'):
-        print(f"Variable weights file found for {database}"
+        logger.info(f"Variable weights file found for {database}"
               f" with {sigma} sigma. Using this for composite weight calculation.")
         scenario_variable_weights = read_csv(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma.csv')
         if os.path.exists(DIVERSITY_DIR + f'composite_weights_{database}_{sigma}_sigma.csv'):
-            print(f"Composite weights file found for {database}"
+            logger.info(f"Composite weights file found for {database}"
                   f" with {sigma} sigma. Skipping calculation.")
         else:
-            print(f'Calculating composite weights for database {database} with {sigma} sigma...\n')
+            logger.info(f'Calculating composite weights for database {database} with {sigma} sigma...')
             calculate_composite_weight(scenario_variable_weights, data_for_diversity, 
                                        f'{sigma}_sigma', variable_info=variable_weights)
 
     else:
-        print(f"Variable weights file not found for {database} with {sigma} sigma.")
-        print('Please ensure variable weights file is in place or run the variable'
+        logger.warning(f"Variable weights file not found for {database} with {sigma} sigma.")
+        logger.warning('Please ensure variable weights file is in place or run the variable'
               ' weight calculation step with the desired sigma value.')
     
-    print('Diversity weighting has finished running. Please check the outputs/diversity/'
+    logger.info('Diversity weighting has finished running. Please check the outputs/diversity/'
           ' directory for the variable and composite weights files.')
-
 
 
 # Function that calculates pairwise RMS distances for each variable in the data
 def calculate_pairwise_rms_distances(data, variables, database, start_year=2020, end_year=2100):
+
     """
     Function that returns a DataFrame with pairwise RMS distances for each variable, for each
     pair of scenarios in the database.
@@ -268,7 +265,8 @@ def run_database_segment_sensitivity(database_pairwise : pd.DataFrame,
                                      variables_info : dict,
                                      ar6_tier_0_data: pd.DataFrame,
                                      meta_data : pd.DataFrame,
-                                     category_groupings : list):
+                                     category_groupings : list,
+                                     variables = TIER_0_VARIABLES_AR6):
 
     """
     This function performs sensitivity analysis on the database by segmenting it based on the specified categories
@@ -302,31 +300,33 @@ def run_database_segment_sensitivity(database_pairwise : pd.DataFrame,
         
         output_id = f"{category_grouping}_{sigma}_correl"
         # check if file exists first
-        if os.path.exists(DIVERSITY_OUTPUT_DIR + f'sensitivity/variable_weights_{database}_{output_id}.csv'):
-            variable_weights = read_csv(DIVERSITY_OUTPUT_DIR + f"sensitivity/variable_weights_{database}_{output_id}.csv")
+        if os.path.exists(DIVERSITY_DIR + f'sensitivity/variable_weights_{database}_{output_id}.csv'):
+            variable_weights = read_csv(DIVERSITY_DIR + f"sensitivity/variable_weights_{database}_{output_id}.csv")
         else:
             variable_weights = calculate_variable_weights(database_pairwise_category, 
                                        sigma_values, database, 
-                                       f'{category_grouping}_{sigma}_correl', TIER_0_VARIABLES, return_df=True, sensitivity='sensitivity/')
+                                       f'{category_grouping}_{sigma}_correl', variables, return_df=True, sensitivity='sensitivity/')
 
         calculate_composite_weight(variable_weights, ar6_tier_0_data, 
-                                f'{output_id}', variables_info, output_dir=DIVERSITY_OUTPUT_DIR + 'sensitivity/')
+                                f'{output_id}', variables_info, output_dir=DIVERSITY_DIR + 'sensitivity/')
 
 
 
-def calculate_range_variable_weights(database_pairwise, sigma_file, database, variables, sensitivity_override=False, sigmas=None):
+def calculate_range_variable_weights(database_pairwise, sigma_file, database, 
+                                     variables, sensitivity_override=False, 
+                                     sigmas=None):
 
     if sigmas is None:
         sigmas = ['min', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', 'max']
     for sigma in sigmas:
         if os.path.exists(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma.csv') and not sensitivity_override:
-            print(f"Variable weights file found for {database} with {sigma} sigma. Skipping calculation.")
+            logger.info(f"Variable weights file found for {database} with {sigma} sigma. Skipping calculation.")
             continue
         else:
             sigma_values = sigma_file[sigma].to_dict()
-            print(f"Calculating variable weights for {sigma} sigma.\n")
+            logger.info(f"Calculating variable weights for {sigma} sigma.")
             calculate_variable_weights(database_pairwise, sigma_values, database, sigma + '_sigma', variables)
-            print(f"Variable weights calculated for sigma {sigma}")
+            logger.info(f"Variable weights calculated for sigma {sigma}")
 
 
 # Function to Calculate sigma values
@@ -430,10 +430,9 @@ def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables, database):
     return sigma_values
     
 
-
 # Function that reweights the scenarios based on the pairwise RMS distances and the sigma input
 def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, 
-                               variables, return_df=False, sensitivity=None):
+                               variables):
 
     """
     Calculate weights for each variable and scenario based on pairwise RMS distances and sigma values.
@@ -470,12 +469,18 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id,
         # Initialise distance matrix
         dist_matrix = np.full((n, n), np.nan)
 
-        # Fill the distance matrix with RMS distances
-        for _, row in var_df.iterrows():
-            i = index[(row['Model_1'], row['Scenario_1'])]
-            j = index[(row['Model_2'], row['Scenario_2'])]
-            dist_matrix[i, j] = row['RMS_Distance']
-            dist_matrix[j, i] = row['RMS_Distance']  # symmetric
+        # Fill the distance matrix with RMS distances (old iteration)
+        # for _, row in var_df.iterrows():
+        #     i = index[(row['Model_1'], row['Scenario_1'])]
+        #     j = index[(row['Model_2'], row['Scenario_2'])]
+        #     dist_matrix[i, j] = row['RMS_Distance']
+        #     dist_matrix[j, i] = row['RMS_Distance']  # symmetric
+        
+        # Fill the distance matrix with RMS distances 
+        idx_i = var_df[['Model_1', 'Scenario_1']].apply(tuple, axis=1).map(index).values
+        idx_j = var_df[['Model_2', 'Scenario_2']].apply(tuple, axis=1).map(index).values
+        dist_matrix[idx_i, idx_j] = var_df['RMS_Distance'].values
+        dist_matrix[idx_j, idx_i] = var_df['RMS_Distance'].values  
 
         # Apply weighting for variable, ignore the diagonal (i ≠ j)
         mask = ~np.eye(n, dtype=bool) & ~np.isnan(dist_matrix)
@@ -497,13 +502,13 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id,
 
     # Save output
     variable_weights_df.to_csv(DIVERSITY_DIR + f'variable_weights_{database}_{output_id}.csv', index=False)
-
-    if return_df:
-        return variable_weights_df
+    return variable_weights_df
 
 
 # combines the weights from each of the variables using the group and sub-group weights
-def calculate_composite_weight(weighting_data_file, original_scenario_data, output_id, variable_info=VARIABLE_INFO, 
+def calculate_composite_weight(weighting_data_file, 
+                               original_scenario_data, 
+                               output_id, variable_info=VARIABLE_INFO, 
                                flat_weights=None, output_dir=DIVERSITY_DIR):
 
     """
@@ -511,7 +516,7 @@ def calculate_composite_weight(weighting_data_file, original_scenario_data, outp
     of variables and adjusts weights accordingly.
 
     Inputs:
-        wieghting_data_file (DataFrame): DataFrame containing the weights for each variable and scenario.
+        weighting_data_file (DataFrame): DataFrame containing the weights for each variable and scenario.
         original_scenario_data (DataFrame): DataFrame containing the original scenario data - used to check for variable reporting
         output_id (str): Identifier for the output file.
         variable_info (dict): Dictionary containing the weights for each group/sub-group. Default is the global VARIABLE_INFO.
@@ -540,6 +545,8 @@ def calculate_composite_weight(weighting_data_file, original_scenario_data, outp
         variable_df = variable_df.rename(columns={'index': 'Variable'})
         variable_df['variable_weight'] = variable_df['group_weight'] * variable_df['subgroup_weight']
 
+    default_variable_df = variable_df.copy()
+
     scenarios = []
     models = []
     weights = []
@@ -567,7 +574,8 @@ def calculate_composite_weight(weighting_data_file, original_scenario_data, outp
             variable_df = pd.DataFrame.from_dict(updated_variable_info, orient='index').reset_index()
             variable_df = variable_df.rename(columns={'index': 'Variable'})
             variable_df['variable_weight'] = variable_df['group_weight'] * variable_df['subgroup_weight']
-    
+        else:
+            variable_df = default_variable_df.copy()
 
         scenario_weighting_data = scenario_weighting_data.merge(
             variable_df[['Variable', 'variable_weight']],
@@ -642,7 +650,7 @@ def adjust_weights_for_missing_variables(missing_variables, variable_info):
         # Adjusting the subgroup weights if group exists but subgroup weights don't sum to 1
         else:
             subgroup_weights = [variable_info[var]['subgroup_weight'] for var in group_variables]
-            if sum(subgroup_weights) != 1:
+            if not np.isclose(sum(subgroup_weights), 1.0):
                 for var in group_variables:
                     variable_info[var]['subgroup_weight'] = variable_info[var]['subgroup_weight'] / (sum(subgroup_weights) + 1e-8)
 
@@ -666,7 +674,7 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
     for each sigma value.
 
     """
-    stats = pd.DataFrame(columns=['Variable', 'Sigma', 'IQR', 'EFSS'])
+    stats = pd.DataFrame(columns=['Variable', 'Sigma', 'IQR'])
 
     # Loop through each sigma value
     for sigma in sigma_values:
@@ -675,28 +683,15 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
         sigma_df = read_csv(DIVERSITY_DIR + f"variable_weights_{database}_{sigma}_sigma.csv")
         variables = sigma_df['Variable'].unique().tolist()
 
-        # sigma_df['Weight'] = -sigma_df['Weight']
-        # if min(sigma_df['Weight']) < 0:
-
-        #     # If the minimum weight is negative, we need to shift the weights to make them all positive
-        #     sigma_df['Weight'] = sigma_df['Weight'] - np.min(sigma_df['Weight'])
-
-        # sigma_df['Weight'] = sigma_df['Weight'] / np.sum(sigma_df['Weight'])
-
         iqrs = []
-        effective_sample_size = []
         # Loop through each variable
         for variable in variables:
-
             variable_df = sigma_df[sigma_df['Variable'] == variable]
-
             # get the IQR of the weights
             iqrs.append(variable_df['Weight'].quantile(0.75) - variable_df['Weight'].quantile(0.25))
                         
-
         # Calculate the mean IQR for the set
         mean_iqr = np.mean(iqrs) 
-        mean_efss = np.mean(effective_sample_size)
         iqrs.append(mean_iqr)
         variables.append('mean')
 

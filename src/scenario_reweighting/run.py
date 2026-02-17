@@ -24,7 +24,7 @@ def main():
 
     # run diversity calculation sequentially
     diversity_main(database='ar6', start_year=2020, end_year=2100, 
-                    data_for_diversity=scenarios_data)
+                    data_for_diversity=scenarios_data, pairwise_override=True)
 
 
 # check for inputs and outputs
