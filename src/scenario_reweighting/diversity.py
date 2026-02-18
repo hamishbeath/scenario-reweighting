@@ -12,6 +12,13 @@ from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Ensure output is visible even if no handler is configured upstream
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
+    logger.addHandler(_handler)
 
 
 def main(database: str, start_year, end_year, data_for_diversity, default_sigma=False,
@@ -156,7 +163,7 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
         else:
             logger.info(f'Calculating composite weights for database {database} with {sigma} sigma...')
             calculate_composite_weight(scenario_variable_weights, data_for_diversity, 
-                                       f'{sigma}_sigma', variable_info=variable_weights)
+                                       f'{database}_{sigma}_sigma', variable_info=variable_weights)
 
     else:
         logger.warning(f"Variable weights file not found for {database} with {sigma} sigma.")
@@ -508,7 +515,7 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id,
 # combines the weights from each of the variables using the group and sub-group weights
 def calculate_composite_weight(weighting_data_file, 
                                original_scenario_data, 
-                               output_id, variable_info=VARIABLE_INFO, 
+                               output_id, variable_info=VARIABLE_INFO,
                                flat_weights=None, output_dir=DIVERSITY_DIR):
 
     """
