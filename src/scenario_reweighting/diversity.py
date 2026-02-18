@@ -191,9 +191,6 @@ def calculate_pairwise_rms_distances(data, variables, database, start_year=2020,
     Returns:
     DataFrame: A DataFrame with pairwise RMS distances for each variable.
 
-    NOTE: At this point, the weights are not inverted. High weighting at this point 
-    means the scenario is more similar to the others, and thus less diverse.
-
     """
     # perform initial checks
     if database not in DATABASES:
@@ -253,10 +250,10 @@ def calculate_pairwise_rms_distances(data, variables, database, start_year=2020,
 
     # Build result DataFrame
     pairwise_rms_df = pd.DataFrame(results)
-    # print(pairwise_rms_df)
 
     # Save the results to a CSV file
     pairwise_rms_df.to_csv(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv', index=False)
+    return pairwise_rms_df
 
 
 # returns rms difference between two time series
@@ -475,13 +472,6 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id,
 
         # Initialise distance matrix
         dist_matrix = np.full((n, n), np.nan)
-
-        # Fill the distance matrix with RMS distances (old iteration)
-        # for _, row in var_df.iterrows():
-        #     i = index[(row['Model_1'], row['Scenario_1'])]
-        #     j = index[(row['Model_2'], row['Scenario_2'])]
-        #     dist_matrix[i, j] = row['RMS_Distance']
-        #     dist_matrix[j, i] = row['RMS_Distance']  # symmetric
         
         # Fill the distance matrix with RMS distances 
         idx_i = var_df[['Model_1', 'Scenario_1']].apply(tuple, axis=1).map(index).values

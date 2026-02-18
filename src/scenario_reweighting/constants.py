@@ -11,6 +11,7 @@ import numpy as np
 OUTPUT_DIR = "outputs/"
 INPUT_DIR = "inputs/"
 DIVERSITY_DIR = OUTPUT_DIR + "diversity/"
+QUALITY_DIR = OUTPUT_DIR + "quality/"
 
 # IAM Data constants
 CATEGORIES_ALL = ['C1', 'C2', 'C3', 'C4', 'C5','C6', 'C7', 'C8']
