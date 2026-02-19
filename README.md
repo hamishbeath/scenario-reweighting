@@ -14,6 +14,8 @@ Presently, users of emission scenario ensembles typically treat each scenario in
 ## What to consider before getting started?
 Approaches to scenario weighting vary depending on the aims of the user. Here, we provide the code that can allow users to reweight using a set of specific methods and criteria; however, reweighting should not be limited to these. This code can provide a basis for future conceptual and methodological development. Before getting started with the weighting approach implemented here, a core set of emission scenario data will be needed. We apply it to the emission scenario ensemble from the IPCC's 6th Assessment Report. However, provided the variables and metadata are available, this code could be used for other scenario ensembles. 
 
+## How to run?
+To run the weighting procedure, the run.py file can be used. Some parameters need updating within the run.py file before getting started. Then, for detailed guidance on how to configure each of the diversity, quality and relevance weightings, refer to the relevant readme files for each module. 
 
 
 
