@@ -8,7 +8,7 @@ This codebase allows users to reweight emission scenario ensembles based on dive
 
 * **Quality weighting** is applied to scenarios based on a set of specific criteria that are important for a given research question. Application of a continuous quality weighting may provide an alternative to simple inclusion/exclusion vetting procedures. 
 
-![Figure overview](figures/fig1.png)
+![Figure overview](figures/framework_overview.png)
 
 ## Why Reweight Emission Scenario Ensembles?
 Presently, users of emission scenario ensembles typically treat each scenario included in the ensemble or subset with equal weight. This is even though some scenarios may be almost identical to others and offer little or no new information. Alternatively, for a range of reasons, some scenarios may not be as relevant as others for a specific question. A different way to display scenario ensemble data is to assign different weights to scenarios based on a set of user-defined goals, and then display the data and calculate summary statistics. So, rather than each scenario being given an even weight, they are given differing weights depending on what the user wants to consider. Although it does not overcome all the problems of looking at summary statistics from scenario ensembles, this reweighting framework aims to move in the direct of viewing a more balanced ensemble. 
