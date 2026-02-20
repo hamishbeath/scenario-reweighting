@@ -10,7 +10,7 @@ This codebase allows users to reweight emission scenario ensembles based on dive
 
 ![Figure overview](figures/framework_overview.png)
 
-*Figure from Beath et al., A weighting framework to improve the use of emissions scenario ensembles of opportunity, Nature Climate Change (2026). CC BY 4.0 [doi.org/10.1038/s41558-026-02565-5](https://doi.org/10.1038/s41558-026-02565-5).
+<sub>Figure from Beath et al. (2026), A weighting framework to improve the use of emissions scenario ensembles of opportunity, Nature Climate Change. CC BY 4.0 [doi.org/10.1038/s41558-026-02565-5](https://doi.org/10.1038/s41558-026-02565-5).</sub>
 
 ## Why Reweight Emission Scenario Ensembles?
 Presently, users of emission scenario ensembles typically treat each scenario included in the ensemble or subset with equal weight. This is even though some scenarios may be almost identical to others and offer little or no new information. Alternatively, for a range of reasons, some scenarios may not be as relevant as others for a specific question. A different way to display scenario ensemble data is to assign different weights to scenarios based on a set of user-defined goals, and then display the data and calculate summary statistics. So, rather than each scenario being given an even weight, they are given differing weights depending on what the user wants to consider. Although it does not overcome all the problems of looking at summary statistics from scenario ensembles, this reweighting framework aims to move in the direct of viewing a more balanced ensemble. 
