@@ -35,6 +35,7 @@ Scenarios that are more similar to many others receive lower diversity weights, 
 
 The diversity weighting process quantifies how distinct each scenario is from all others in the ensemble, using **root-mean-square (RMS) distance** over time-series data for a set of indicator variables (e.g. emissions, energy mix, GDP). A Gaussian kernel controlled by a **sigma** parameter converts distances into similarity scores, which are then inverted and normalised to produce final diversity weights.
 
+
 ---
 
 ## Pipeline
