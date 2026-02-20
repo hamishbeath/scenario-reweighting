@@ -8,8 +8,8 @@ This codebase allows users to reweight emission scenario ensembles based on dive
 
 * **Quality weighting** is applied to scenarios based on a set of specific criteria that are important for a given research question. Application of a continuous quality weighting may provide an alternative to simple inclusion/exclusion vetting procedures. 
 
-<img src="figures/framework_overview_light.png#gh-light-mode-only" alt="Figure overview" width="700">
-<img src="figures/framework_overview_dark.png#gh-dark-mode-only" alt="Figure overview" width="700">
+<img src="figures/framework_overview_light.png#gh-light-mode-only" alt="Figure overview">
+<img src="figures/framework_overview_dark.png#gh-dark-mode-only" alt="Figure overview">
 
 <sub>Figure from Beath et al. (2026), A weighting framework to improve the use of emissions scenario ensembles of opportunity, <i>Nature Climate Change</i>. CC BY 4.0 <a href="https://doi.org/10.1038/s41558-026-02565-5">doi.org/10.1038/s41558-026-02565-5</a>.</sub>
 
