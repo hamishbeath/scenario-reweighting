@@ -8,6 +8,7 @@ This codebase allows users to reweight emission scenario ensembles based on dive
 
 * **Quality weighting** is applied to scenarios based on a set of specific criteria that are important for a given research question. Application of a continuous quality weighting may provide an alternative to simple inclusion/exclusion vetting procedures. 
 
+
 ![Figure overview](figures/framework_overview.png)
 
 ## Why Reweight Emission Scenario Ensembles?
