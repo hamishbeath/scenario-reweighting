@@ -10,10 +10,9 @@ from utils.file_parser import read_csv
 from pathlib import Path
 import sys
 
-DIVERSITY_DATA_FILE = 'ar6_pathways_tier0.csv'
-META_DATA_FILE = 'ar6_meta_data.csv'
-QUALITY_DATA_FILE = 'quality_weighting_data.csv'
-DATABASE = 'ar6'
+DIVERSITY_DATA_FILE = ['your_diversity_data_filename_here.csv']
+META_DATA_FILE = ['your_metadata_filename_here.csv']
+QUALITY_DATA_FILE = ['your_quality_data_filename_here.csv']
 
 def main(diversity=False, quality=False, relevance=True):
     
