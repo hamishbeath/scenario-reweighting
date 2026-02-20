@@ -65,7 +65,6 @@ def main(diversity=False, quality=False, relevance=True):
         )
 
 
-
 # check for inputs and outputs
 def check_io(diversity=False, quality=False, relevance=False):
     repo_root = Path(__file__).resolve().parents[2]

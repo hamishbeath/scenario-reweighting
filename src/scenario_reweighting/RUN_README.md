@@ -14,7 +14,7 @@ Each module can be toggled on or off via the `main()` function arguments.
 
 ## Filepaths to Update
 
-The input and output directories are defined in `constants.py`:
+### 1. Input / output directories (in `constants.py`)
 
 | Constant     | Default Value | Description              |
 |--------------|---------------|--------------------------|
@@ -31,30 +31,62 @@ repo_root = Path(__file__).resolve().parents[2]
 
 This assumes `run.py` lives at `<repo_root>/src/scenario_reweighting/run.py`. If you move the file, adjust the `parents` index accordingly.
 
+### 2. Input filename placeholders (in `run.py`)
+
+The three file-name variables at the top of `run.py` are **placeholders that you must fill in** before running:
+
+```python
+DIVERSITY_DATA_FILE = ['your_diversity_data_filename_here.csv']
+META_DATA_FILE      = ['your_metadata_filename_here.csv']
+QUALITY_DATA_FILE   = ['your_quality_data_filename_here.csv']
+```
+
+Replace each placeholder string with the actual CSV filename sitting in your `inputs/` directory. For example, if you are using the default AR6 data shipped with this repo:
+
+```python
+DIVERSITY_DATA_FILE = ['ar6_pathways_tier0.csv']
+META_DATA_FILE      = ['ar6_meta_data.csv']
+QUALITY_DATA_FILE   = ['quality_weighting_data.csv']
+```
+
+### 3. Database selector (in `run.py`)
+
+```python
+DATABASE = 'ar6'   # 'ar6' or 'sci'
+```
+
+Set `DATABASE` to match the scenario ensemble you are working with:
+
+| Value  | Description |
+|--------|-------------|
+| `ar6`  | IPCC AR6 scenario database (full support for all three modules) |
+| `sci`  | SCI scenario database (**diversity weighting only** at present) |
+
 ---
 
 ## Required Input Files
 
 All input files must be placed in the `inputs/` directory at the repository root.
+Make sure the filenames you set in the placeholder variables (see above) match the actual files in this directory.
 
 ### Diversity module (`diversity=True`)
 
-| File | Description |
-|------|-------------|
-| `ar6_pathways_tier0.csv` | AR6 scenario pathway data (Tier 0 variables) |
+| Variable | What to provide |
+|----------|----------------|
+| `DIVERSITY_DATA_FILE` | A CSV of scenario pathway data containing the Tier 0 variables (e.g. `ar6_pathways_tier0.csv`) |
 
 ### Quality module (`quality=True`)
 
-| File | Description |
-|------|-------------|
-| `ar6_meta_data.csv` | AR6 scenario metadata (model, project, category, etc.) |
-| `quality_weighting_data.csv` | Quality scoring / vetting criteria data |
+| Variable | What to provide |
+|----------|----------------|
+| `META_DATA_FILE` | A CSV of scenario metadata — model, project, climate category, etc. (e.g. `ar6_meta_data.csv`) |
+| `QUALITY_DATA_FILE` | A CSV of quality scoring / vetting criteria data (e.g. `quality_weighting_data.csv`) |
 
 ### Relevance module (`relevance=True`)
 
-| File | Description |
-|------|-------------|
-| `ar6_meta_data.csv` | AR6 scenario metadata (shared with Quality) |
+| Variable | What to provide |
+|----------|----------------|
+| `META_DATA_FILE` | Same metadata CSV used by Quality (shared) |
 
 ---
 
