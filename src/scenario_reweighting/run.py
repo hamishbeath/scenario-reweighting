@@ -13,6 +13,7 @@ import sys
 DIVERSITY_DATA_FILE = ['your_diversity_data_filename_here.csv']
 META_DATA_FILE = ['your_metadata_filename_here.csv']
 QUALITY_DATA_FILE = ['your_quality_data_filename_here.csv']
+DATABASE = 'ar6' # 'ar6' or 'sci' - note, sci only supported for diversity weighting at present.
 
 def main(diversity=False, quality=False, relevance=True):
     
