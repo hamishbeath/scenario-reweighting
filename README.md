@@ -9,7 +9,11 @@ This codebase allows users to reweight emission scenario ensembles based on dive
 * **Quality weighting** is applied to scenarios based on a set of specific criteria that are important for a given research question. Application of a continuous quality weighting may provide an alternative to simple inclusion/exclusion vetting procedures. 
 
 
-![Figure overview](figures/framework_overview.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="figures/framework_overview_dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="figures/framework_overview_light.png">
+  <img alt="Figure overview" src="figures/framework_overview_light.png">
+</picture>
 
 <sub>Figure from Beath et al. (2026), A weighting framework to improve the use of emissions scenario ensembles of opportunity, *Nature Climate Change*. CC BY 4.0 [doi.org/10.1038/s41558-026-02565-5](https://doi.org/10.1038/s41558-026-02565-5).</sub>
 
@@ -22,7 +26,7 @@ Approaches to scenario weighting vary depending on the aims of the user. Here, w
 ## How to run?
 At present, to run the weighting procedure, users can launch the run.py module. Some parameters need updating within the run.py file before getting started. Then, for detailed guidance on how to configure each of the modules, refer to the relevant [diversity](src/scenario_reweighting/DIVERSITY_README.md), [quality](src/scenario_reweighting/QUALITY_README.md) and [relevance](src/scenario_reweighting/RELEVANCE_README.md) weighting README files. 
 
-You will need to download the appropriate scenario ensemble data to run the weighting procedure. This can be downloaded from the [AR6 database](https://data.ene.iiasa.ac.at/ar6/#/login) or [SCI database](https://scenariocompass.org/) directly, or advanced users can use functionality within the utils module of this codebase that uses Pyam to download this data. 
+You will need to download the appropriate scenario ensemble data to run the weighting procedure. This can be downloaded from the [AR6 database](https://data.ene.iiasa.ac.at/ar6/#/login) or [SCI database](https://scenariocompass.org/) directly, or advanced users can use functionality within the utils module of this codebase that uses Pyam to download this data.
 
 
 
