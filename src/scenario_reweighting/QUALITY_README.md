@@ -9,6 +9,7 @@ Scenarios whose reported values fall outside a tolerance range around observed v
 ## Table of Contents
 
 - [Overview](#overview)
+- [Data Needed](#data-needed)
 - [Pipeline](#pipeline)
 - [Entry Point](#entry-point)
 - [Core Functions](#core-functions)
@@ -27,7 +28,16 @@ Scenarios whose reported values fall outside a tolerance range around observed v
 For each vetting criterion, the module computes the absolute distance between a scenario's reported value and the observed reference value. Scenarios that exceed a defined tolerance range are flagged as failures and excluded. The remaining scenarios are weighted using a Gaussian kernel applied to their IQR-scaled distances, so that scenarios closer to observed data receive higher weights. Per-criterion weights are then summed and normalised to produce a single quality weight per scenario.
 
 ---
+## Data Needed
+To run the quality weighting, you will need a .csv file saved with timeseries scenario data in IAMC format for the variables you want to use for your quality weighting. You will need the years of data relevant to your assessment, e.g., if you are looking at accuracy of historical values e.g., 2019, you will need the relevant years of data around it to intepolate (i.e. 2015, 2020). This should be in wide format, with 'Model', 'Scenario', 'Variable' columns, and columns of data for the years you wish to assess. For example:
 
+| Model | Scenario | Region | Variable | Unit | 2010 | 2020 | 
+|---|---|---|---|---|---|---|
+| AIM/CGE 2.0 | SSP1-26 | World | Primary Energy | EJ/yr | 470.1648 | 512.7591 | 
+| AIM/CGE 2.0 | SSP1-26 | World | Secondary Energy|Electricity|Nuclear | EJ/yr | 11.0404 | 12.8653 | 
+
+
+---
 ## Pipeline
 
 The `main()` function orchestrates a simple pipeline:
