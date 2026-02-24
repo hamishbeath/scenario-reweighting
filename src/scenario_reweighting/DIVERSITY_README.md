@@ -43,7 +43,7 @@ To run the diversity weighting, you will need a .csv file saved with timeseries 
 | Model | Scenario | Region | Variable | Unit | 2020 | 2030 | 2040 |
 |---|---|---|---|---|---|---|---|
 | AIM/CGE 2.0 | SSP1-26 | World | Emissions\|CO2 | Mt CO2/yr | 37181.3385 | 29790.5086 | 19431.3522 |
-| AIM/CGE 2.0 | SSP1-26 | World | "Emissions\|N2O | kt N2O/yr | 9939.2486 | 6428.7671 | 5998.9679 |
+| AIM/CGE 2.0 | SSP1-26 | World | Emissions\|N2O | kt N2O/yr | 9939.2486 | 6428.7671 | 5998.9679 |
 
 ---
 
