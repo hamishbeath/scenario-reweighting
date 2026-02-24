@@ -34,7 +34,7 @@ To run the quality weighting, you will need a .csv file saved with timeseries sc
 | Model | Scenario | Region | Variable | Unit | 2010 | 2020 | 
 |---|---|---|---|---|---|---|
 | AIM/CGE 2.0 | SSP1-26 | World | Primary Energy | EJ/yr | 470.1648 | 512.7591 | 
-| AIM/CGE 2.0 | SSP1-26 | World | Secondary Energy|Electricity|Nuclear | EJ/yr | 11.0404 | 12.8653 | 
+| AIM/CGE 2.0 | SSP1-26 | World | Secondary Energy\|Electricity\|Nuclear | EJ/yr | 11.0404 | 12.8653 | 
 
 
 ---
