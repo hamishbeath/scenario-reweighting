@@ -785,6 +785,53 @@ VETTING_CRITERIA = {'CO2 Total':{'Variables':['Emissions|CO2'],
                                 'Range': 0.50,
                                 'Year': 2018}} # +/- % #
 
+
+VETTING_CRITERIA_SCI = {
+    'Historical population': {
+        'Include': False,
+        'Variables': ['Population'],
+        'Value': [7003.35, 7444.43, 7859.46, 8208.9],  # Million people
+        'Range': [0.25, 0.25, 0.25, 0.25],
+        'Year': [2010, 2015, 2020, 2025]},  # +/- %
+    'Historical GDP': {
+        'Include': False,
+        'Variables': ['GDP|PPP'],
+        'Value': [89038, 105442, 121816, 141951],  # billion USD_2010/yr
+        'Range': [0.25, 0.25, 0.25, 0.25],
+        'Year': [2010, 2015, 2020, 2025]},  # +/- %
+    'Historical EIP emissions': {
+        'Include': True,
+        'Variables': ['Emissions|CO2|Energy and Industrial Processes'],
+        'Value': [33460.1, 35627.3, 36315.3, 39383.5],  # in Mt CO2/yr - TODO: fill from CEDS (Hoesly, 2025)
+        'Range': [0.25, 0.25, 0.27, 0.25],
+        'Year': [2010, 2015, 2020, 2025]},  # +/- %
+    'Final Energy': {
+        'Include': True,
+        'Variables': ['Final Energy'],
+        'Value': [365.074, 389.56, 395.78, 443.09 ],  # TODO: fill from IEA (2024)
+        'Range': [0.25, 0.25, 0.40, 0.25],
+        'Year': [2010, 2015, 2020, 2025]},  # +/- %
+    'Historical fossil primary energy - Coal': {
+        'Include': True,
+        'Variables': ['Primary Energy|Coal'],
+        'Value': [153.51,  161.99, 160.00, 200.43],  # in EJ - TODO: fill from IEA (2024)
+        'Range': [0.25, 0.25, 0.40, 0.25],
+        'Year': [2010, 2015, 2020, 2025]},  # +/- %
+    'Historical fossil primary energy - Oil': {
+        'Include': True,
+        'Variables': ['Primary Energy|Oil'],
+        'Value': [167.72, 180.60, 173.40, 197.75],  # in EJ - TODO: fill from IEA (2024)
+        'Range': [0.25, 0.25, 0.40, 0.25],
+        'Year': [2010, 2015, 2020, 2025]},  # +/- %
+    'Historical fossil primary energy - Gas': {
+        'Include': True,
+        'Variables': ['Primary Energy|Gas'],
+        'Value': [126.22, 138.32, 155.11, 164.66],  # in EJ - TODO: fill from IEA (2024)
+        'Range': [0.25, 0.25, 0.40, 0.25],
+        'Year': [2010, 2015, 2020, 2025]},  # +/- %
+}
+
+
 VETTING_VARS = ['Emissions|CO2', 'Emissions|CO2|Energy and Industrial Processes', 'Emissions|CH4', 'Primary Energy',
                 'Secondary Energy|Electricity|Nuclear', 'Secondary Energy|Wind', 'Secondary Energy|Solar']
 
