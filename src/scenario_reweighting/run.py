@@ -38,12 +38,10 @@ def main(diversity=False, quality=False, relevance=True):
         check_io(quality=True)
 
         # read in data for quality weighting calculation
-        meta_data = read_csv(INPUT_DIR + META_DATA_FILE)
         quality_weighting_data = read_csv(INPUT_DIR + QUALITY_DATA_FILE)
 
         # run quality weighting calculation
         quality_weights = quality_main(
-            meta_data,
             quality_weighting_data,
             database=DATABASE,
             vetting_criteria=None,
@@ -91,11 +89,6 @@ def check_io(diversity=False, quality=False, relevance=False):
             sys.exit(1)
 
     if quality:
-        meta_data_file = inputs_dir / META_DATA_FILE
-        if not meta_data_file.exists():
-            print(SCENARIO_DATA_NOT_FOUND)
-            sys.exit(1)
-        
         quality_data_file = inputs_dir / QUALITY_DATA_FILE
         if not quality_data_file.exists():
             print(SCENARIO_DATA_NOT_FOUND)

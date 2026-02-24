@@ -27,6 +27,17 @@ Scenarios whose metadata values sit close to the category median for a given var
 For each category, the module identifies the median value of every relevance variable among the scenarios in that category. A sigmoid function then maps each scenario's distance from the median to a weight between 0 and 1, where scenarios closer to the median score higher. Per-variable weights are scaled by user-defined importance factors and summed, then normalised to produce a single relevance weight per scenario.
 
 ---
+## Data Needed
+To run the relevance weighting, you will need a .csv file saved with the relevant metadata for the variables you want to use for your relevance weighting. This should be in wide format, with 'Model', 'Scenario', and then columns for the relevant meta data used in your relevance weighting. 
+
+An example of the metadata format:
+
+| Model | Scenario | Category | Category_subset | CO2 emissions 2050 Gt CO2/yr | Policy_category | 
+|---|---|---|---|---|---|---|
+| AIM/CGE 2.0 | SSP1-26 | C3 | C3y_+veGHGs | 13.6789516 | 470.1648 | P2a | 
+| AIM/CGE 2.0 | SSP1-34 | C5 | C5 | EJ/yr | 26.4760442 | P2a | 
+
+---
 
 ## Pipeline
 

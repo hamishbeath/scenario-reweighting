@@ -23,7 +23,6 @@ if not logger.handlers:
 
 
 def main(
-    meta_data,
     quality_weighting_data,
     database,
     vetting_criteria=None,
@@ -36,7 +35,6 @@ def main(
     Note: Currently only works for AR6 data.
 
     Parameters:
-        meta_data: DataFrame with scenario metadata.
         quality_weighting_data: DataFrame with scenario data for quality weighting.
         database: String specifying the database (e.g. 'ar6').
         vetting_criteria: Dict with vetting criteria variables.
@@ -67,7 +65,6 @@ def main(
 
         quality_weights = calculate_quality_weighting(
             quality_weighting_data,
-            meta_data,
             database=database,
             vetting_criteria=vetting_criteria,
             interpolate=True,
@@ -84,17 +81,15 @@ def main(
 
 def calculate_quality_weighting(
     scenario_data,
-    meta_data,
     database,
     vetting_criteria=VETTING_CRITERIA,
-    interpolate=False,
+    interpolate=True,
 ):
     """
     Calculate quality weighting for scenario data based on vetting criteria.
 
     Parameters:
         scenario_data: DataFrame with scenario data for quality weighting.
-        meta_data: DataFrame with scenario metadata.
         database: String specifying the database (e.g. 'ar6').
         vetting_criteria: Dict with vetting criteria variables.
         interpolate: Whether to interpolate scenario data.
@@ -149,15 +144,15 @@ def calculate_quality_weighting(
         fail_count = criteria_sums[criteria_sums["pass"] == False].shape[0]
         # print(f"Number of scenarios that fail criteria: {fail_count}")
 
-        # Export failed scenarios to CSV
-        criteria_fail_output = criteria_sums[criteria_sums["pass"] == False]
-        criteria_fail_output = criteria_fail_output.join(
-            meta_data.set_index(["Scenario", "Model"]),
-            on=["Scenario", "Model"],
-        )
-        criteria_fail_output.to_csv(
-            OUTPUT_DIR + f"failed_{criteria}_scenarios.csv"
-        )
+        # # Export failed scenarios to CSV
+        # criteria_fail_output = criteria_sums[criteria_sums["pass"] == False]
+        # criteria_fail_output = criteria_fail_output.join(
+        #     meta_data.set_index(["Scenario", "Model"]),
+        #     on=["Scenario", "Model"],
+        # )
+        # criteria_fail_output.to_csv(
+        #     OUTPUT_DIR + f"failed_{criteria}_scenarios.csv"
+        # )
 
         criteria_sums_passed = criteria_sums[criteria_sums["pass"] == True]
 

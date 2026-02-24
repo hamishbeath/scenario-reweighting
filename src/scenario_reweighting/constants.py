@@ -759,7 +759,7 @@ RELEVANCE_THRESHOLDS = {
     }
 }
 
-# Quality Weighting Constants
+# Quality Weighting Constants (AR6)
 VETTING_CRITERIA = {'CO2 Total':{'Variables':['Emissions|CO2'],
                                 'Value': 44251, # in MtCO2
                                 'Range': 0.40,
