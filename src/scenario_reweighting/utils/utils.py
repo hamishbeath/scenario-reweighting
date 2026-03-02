@@ -157,3 +157,64 @@ def get_cumulative_values_pandas(df, meta_cols, start_year=2020, end_year=2100):
     
     df_final = df_final.reset_index(drop=True)
     return df_final
+
+
+# def find_missing_scenarios(df_main, df_check):
+    
+#     """
+#     Function that takes as input a main dataframe and a check dataframe,
+#       and returns a dataframe of scenarios that are in the main dataframe 
+#       but not in the check dataframe. 
+
+#     Inputs:
+#     - df_main (pd.DataFrame): The main dataframe containing the scenarios to check against
+#     - df_check (pd.DataFrame): The check dataframe containing the scenarios to check for
+    
+#     Outputs:
+#     - missing (pd.DataFrame): A dataframe of scenarios that are in the main dataframe 
+#     but not in the check dataframe, with columns for model and scenario
+    
+#     """
+
+#     missing = (df_main[['Model','Scenario']].drop_duplicates().merge(df_check[['Model','Scenario']].drop_duplicates(),on=['Model','Scenario'],
+# ...         how='left',
+# ...         indicator=True
+# ...     )
+# ...     .query("_merge == 'left_only'")
+# ...     .drop(columns='_merge'))
+#     return missing
+
+
+# provides a list of scenarios that report on all of the mandatory variables for the given region
+def mandatory_variables_scenarios(df, required_variables):
+
+    """
+    Function that takes as an input a list of mandatory variables and regional coverage and 
+    provides a list of scenarios that report on all of the mandatory variables for the given region
+
+    Inputs:
+    - df (pd.DataFrame): The dataframe containing the data, with columns for model, scenario, variable, region
+    - variables: list of mandatory variables that scenarios must report on to be included in the output
+
+    Outputs:
+    - list of scenarios that report on all of the mandatory variables 
+
+    """
+    filtered_df = df[df['Variable'].isin(required_variables)]
+
+    # Get the list of model scenario pairs reporting on all of the mandatory variables
+    output_df = pd.DataFrame()
+    print(filtered_df)
+    # Group by model and scenario, then filter groups that have all mandatory variables
+    grouped = filtered_df.groupby(['Model', 'Scenario'])
+    print(grouped['Variable'].nunique())
+    valid_groups = grouped.filter(lambda x: x['Variable'].nunique() == len(required_variables))
+
+    
+    # Extract unique model and scenario pairs
+    model_scenario_pairs = valid_groups[['Model', 'Scenario']].drop_duplicates()
+    
+    output_df['model'] = model_scenario_pairs['Model'].values
+    output_df['scenario'] = model_scenario_pairs['Scenario'].values
+        
+    return output_df

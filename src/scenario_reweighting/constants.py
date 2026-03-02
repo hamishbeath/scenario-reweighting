@@ -38,20 +38,31 @@ TIER_0_VARIABLES_AR6 = ['Emissions|CO2',
                     'GDP|PPP',
                     'Price|Carbon']
 
+TIER_0_VARIABLES_CORR = ['Emissions|CO2',
+                    'Emissions|N2O',
+                    'Consumption',
+                    'Carbon Capture|Geological Storage',
+                    'Primary Energy|Nuclear',
+                    'Primary Energy|Non-Biomass Renewables',
+                    'GDP|PPP',
+                    'Price|Carbon']
+
 TIER_0_VARIABLES_SCI = ['Emissions|CO2',
                     'Emissions|N2O',
                     'Final Energy',
                     'Emissions|Sulfur',
-                    'Consumption',
                     'Emissions|CH4',
                     'Primary Energy|Gas',
                     'Primary Energy|Oil',
-                    'Primary Energy|Nuclear',
                     'Primary Energy|Coal',
                     'Primary Energy|Non-Biomass Renewables',
+                    'Primary Energy|Nuclear',
                     'Primary Energy|Biomass',
-                    'GDP|PPP',
-                    'Price|Carbon']
+                    ]
+
+TIER_0_VARIABLES_SCI_OPT = ['Carbon Capture|Geological Storage',
+                        'Price|Carbon', 'GDP|PPP', 'Consumption']
+
 
 VARIABLE_GROUPS = {
     'Emissions|CH4': 'Emissions', 
@@ -780,11 +791,10 @@ VETTING_CRITERIA = {'CO2 Total':{'Variables':['Emissions|CO2'],
                                 'Value': 9.77, # in %
                                 'Range': 0.30,
                                 'Year': 2018}, # +/- % #
-                    'Solar and wind': {'Variables':['Secondary Energy|Wind', 'Secondary Energy|Solar'],
+                    'Solar and wind': {'Variables':['Secondary Energy|Electricity|Solar', 'Secondary Energy|Electricity|Wind'],
                                 'Value': 8.51, # in %
                                 'Range': 0.50,
                                 'Year': 2018}} # +/- % #
-
 
 VETTING_CRITERIA_SCI = {
     'Historical population': {
@@ -829,9 +839,17 @@ VETTING_CRITERIA_SCI = {
         'Value': [126.22, 138.32, 155.11, 164.66],  # in EJ - TODO: fill from IEA (2024)
         'Range': [0.25, 0.25, 0.40, 0.25],
         'Year': [2010, 2015, 2020, 2025]},  # +/- %
+    'Historical fossil primary energy - Nuclear': {
+        'Include': True,
+        'Variables': ['Primary Energy|Nuclear'],
+        'Value': [9.92, 9.25, 9.63, 8.97],  # in EJ - TODO: fill from IEA (2024)
+        'Range': [0.25, 0.25, 0.40, 0.25],
+        'Year': [2010, 2015, 2020, 2025]},  # +/- %
 }
 
 
-VETTING_VARS = ['Emissions|CO2', 'Emissions|CO2|Energy and Industrial Processes', 'Emissions|CH4', 'Primary Energy',
-                'Secondary Energy|Electricity|Nuclear', 'Secondary Energy|Wind', 'Secondary Energy|Solar']
+VETTING_VARS = ['Emissions|CO2', 'Emissions|CO2|Energy and Industrial Processes', 
+                'Emissions|CH4', 'Primary Energy',
+                'Secondary Energy|Electricity|Nuclear', 'Secondary Energy|Electricity|Wind', 
+                'Secondary Energy|Electricity|Solar']
 

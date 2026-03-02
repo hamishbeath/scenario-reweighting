@@ -1,21 +1,54 @@
 
 # import scenario_reweighting.quality 
 # import utils.file_parser
-from constants import INPUT_DIR, CATEGORIES_DEFAULT
+from constants import INPUT_DIR, CATEGORIES_ALL, VETTING_VARS, TIER_0_VARIABLES_SCI, TIER_0_VARIABLES_SCI_OPT
 from diversity import main as diversity_main
 from quality import main as quality_main
 from relevance import main as relevance_main
 from messages import SCENARIO_DATA_NOT_FOUND
-from utils.file_parser import read_csv
+from utils.file_parser import read_csv, read_pyam_df
+from utils.utils import data_download, mandatory_variables_scenarios
 from pathlib import Path
 import sys
 
-DIVERSITY_DATA_FILE = ['your_diversity_data_filename_here.csv']
-META_DATA_FILE = ['your_metadata_filename_here.csv']
-QUALITY_DATA_FILE = ['your_quality_data_filename_here.csv']
+DIVERSITY_DATA_FILE = 'ar6_pathways_tier0.csv'
+META_DATA_FILE = 'your_metadata_filename_here.csv'
+# QUALITY_DATA_FILE = 'quality_data_sci.csv'
+QUALITY_DATA_FILE = 'quality_data_ar6_update.csv'
 DATABASE = 'ar6' # 'ar6' or 'sci' - note, sci only supported for diversity weighting at present.
 
-def main(diversity=False, quality=False, relevance=True):
+def main(diversity=False, quality=False, relevance=False):
+    
+    """
+    Data download/Prepare data for weighting 
+
+    """
+    # ar6_db = read_csv(INPUT_DIR + DIVERSITY_DATA_FILE)
+    # # scenarios = ar6_db['Scenario'].unique().tolist()
+    # # models = ar6_db['Model'].unique().tolist()
+    # data_download(variables=VETTING_VARS, models='*', scenarios='*', region='World', 
+    #                 categories=CATEGORIES_ALL, database=DATABASE, end_year=2030, 
+    #                 file_name=INPUT_DIR + 'quality_data_ar6_update_v2.csv')
+
+    sci_database = read_pyam_df(INPUT_DIR + 'sci_full_ensemble.csv')    
+    scenarios = read_csv(INPUT_DIR + 'sci_scenarios_with_mandatory_variables.csv')
+    variables = TIER_0_VARIABLES_SCI + TIER_0_VARIABLES_SCI_OPT
+    diversity_data = sci_database.filter(scenario=scenarios['Scenario'].tolist(), model=scenarios['Model'].tolist(), variable=variables,
+                                         year=range(2025, 2101))
+    
+    # Save diversity data to file
+    diversity_data.to_csv(INPUT_DIR + 'diversity_data_sci.csv', iamc_index=False)
+    
+
+    """"
+    Check for variable coverage
+    
+    """
+    # sci_ensemble = read_csv(INPUT_DIR + 'sci_full_ensemble.csv')
+    # scenarios = mandatory_variables_scenarios(sci_ensemble, TIER_0_VARIABLES_SCI)
+    # print(len(scenarios))
+    # scenarios.to_csv(INPUT_DIR + 'sci_scenarios_with_mandatory_variables.csv')
+    
     
     """
     Main function that runs the weighting analysis
@@ -46,6 +79,7 @@ def main(diversity=False, quality=False, relevance=True):
             database=DATABASE,
             vetting_criteria=None,
             interpolate=True,
+            hard_vetting=False
         )
 
     if relevance:
