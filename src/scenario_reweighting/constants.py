@@ -58,7 +58,10 @@ TIER_0_VARIABLES_SCI = ['Emissions|CO2',
                     'Primary Energy|Non-Biomass Renewables',
                     'Primary Energy|Nuclear',
                     'Primary Energy|Biomass',
-                    ]
+                    'Carbon Capture|Geological Storage',
+                    'Price|Carbon', 
+                    'GDP|PPP', 
+                    'Consumption']
 
 TIER_0_VARIABLES_SCI_OPT = ['Carbon Capture|Geological Storage',
                         'Price|Carbon', 'GDP|PPP', 'Consumption']
@@ -254,7 +257,12 @@ VARIABLE_INFO_SCI = {
     'Price|Carbon': {
         'group': 'Mitigation',
         'group_weight': 1/4,
-        'subgroup_weight': 1
+        'subgroup_weight': 1/2
+    },
+    'Carbon Capture|Geological Storage': {
+    'group': 'Mitigation',
+    'group_weight': 1/4,
+    'subgroup_weight': 1/2
     }
 }
 
@@ -402,7 +410,7 @@ VARIABLE_INFO_ENERGY = {
         'group_weight': 0,
         'subgroup_weight': 1/2
     },
-    'Carbon Sequestration|CCS': {
+    'Carbon Capture|Geological Storage': {
         'group': 'Mitigation',
         'group_weight': 0,
         'subgroup_weight': 1/2
@@ -492,6 +500,83 @@ CORREL_ADJUSTED_WEIGHTS_FLAT_HC = {
     }
 }
 
+CORREL_ADJUSTED_WEIGHTS_FLAT_HC_SCI = {
+    'Emissions|CH4': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Emissions|CO2': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Emissions|N2O': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Emissions|Sulfur': {
+        'group': 'Emissions',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Primary Energy|Biomass': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Primary Energy|Coal': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Primary Energy|Gas': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Primary Energy|Non-Biomass Renewables': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Primary Energy|Nuclear': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Primary Energy|Oil': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Final Energy': {
+        'group': 'Energy',
+        'group_weight': 1,
+        'subgroup_weight': 0
+    },
+    'Consumption': {
+        'group': 'Economy',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'GDP|PPP': {
+        'group': 'Economy',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Carbon Sequestration|CCS': {
+        'group': 'Mitigation',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    },
+    'Price|Carbon': {
+        'group': 'Mitigation',
+        'group_weight': 1,
+        'subgroup_weight': 0.125
+    }
+}
 VARIABLE_INFO_NO_EMISSIONS = {
     'Emissions|CH4': {
         'group': 'Emissions',
@@ -558,7 +643,7 @@ VARIABLE_INFO_NO_EMISSIONS = {
         'group_weight': 1/3,
         'subgroup_weight': 1/2
     },
-    'Carbon Sequestration|CCS': {
+    'Carbon Capture|Geological Storage': {
         'group': 'Mitigation',
         'group_weight': 1/3,
         'subgroup_weight': 1/2
@@ -587,8 +672,10 @@ CORREL_ADJUSTED_WEIGHTS_FLAT = {'Carbon Sequestration|CCS': 0.06350000662461833,
                            'Primary Energy|Oil': 0.049695307108789395
 }
 
-SIGMAS_SCI = ['0.0', '0.10', '0.20', '0.30', '0.40', '0.50', '0.60', '0.70', '0.80', '0.90', '1.00']
+# SIGMAS_SCI = ['0.0', '0.10', '0.20', '0.30', '0.40', '0.50', '0.60', '0.70', '0.80', '0.90', '1.00']
 SIGMAS_AR6 = ['log_below_1', 'log_below_2', 'log_below_3', 'log_below_4', 'log_below_5', 'log_below_6', '0.00', '0.10', '0.20', '0.30', '0.40', '0.50', '0.60', '0.70', '0.80', '0.90', '1.00']
+SIGMAS_SCI = ['log_below_1', 'log_below_2', 'log_below_3', 'log_below_4', 'log_below_5', 'log_below_6', '0.00', '0.10', '0.20', '0.30', '0.40', '0.50', '0.60', '0.70', '0.80', '0.90', '1.00']
+
 SIGMA_DEFAULT_AR6 = '0.20'
 SIGMA_DEFAULT_SCI = '0.20'
 
@@ -774,27 +861,27 @@ RELEVANCE_THRESHOLDS = {
 VETTING_CRITERIA = {'CO2 Total':{'Variables':['Emissions|CO2'],
                                 'Value': 44251, # in MtCO2
                                 'Range': 0.40,
-                                'Year': 2019}, # +/- % #
+                                'Year': 2020}, # +/- % #
                     'CO2 EIP emissions':{'Variables':['Emissions|CO2|Energy and Industrial Processes'],
                                 'Value': 37646, # in MtCO2
                                 'Range': 0.20,
-                                'Year': 2019}, # +/- % #
+                                'Year': 2020}, # +/- % #
                     'CH4 emissions':{'Variables':['Emissions|CH4'],
                                 'Value': 379.2168, # in MtCH4
                                 'Range': 0.20,
-                                'Year': 2019}, # +/- % #
+                                'Year': 2020}, # +/- % #
                     'Primary Energy': {'Variables':['Primary Energy'],
                                 'Value': 578, # in EJ
                                 'Range': 0.20,
-                                'Year':2018}, # +/- % #
+                                'Year':2020}, # +/- % #
                     'Nuclear electricity': {'Variables':['Secondary Energy|Electricity|Nuclear'],
                                 'Value': 9.77, # in %
                                 'Range': 0.30,
-                                'Year': 2018}, # +/- % #
+                                'Year': 2020}, # +/- % #
                     'Solar and wind': {'Variables':['Secondary Energy|Electricity|Solar', 'Secondary Energy|Electricity|Wind'],
                                 'Value': 8.51, # in %
                                 'Range': 0.50,
-                                'Year': 2018}} # +/- % #
+                                'Year': 2020}} # +/- % #
 
 VETTING_CRITERIA_SCI = {
     'Historical population': {

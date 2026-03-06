@@ -10,6 +10,7 @@ from itertools import combinations
 from utils.file_parser import read_csv
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
+import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -22,19 +23,25 @@ if not logger.handlers:
 
 
 def main(database: str, start_year, end_year, data_for_diversity, default_sigma=False,
+         within_model=False,
          pairwise_override=False, sigma_override=False, sensitivity_override=False, 
-         specify_sigma=None, custom_vars=None, variable_weights=None):
+         composite_override=False, specify_sigma=None, custom_vars=None, variable_weights=None,
+         custom_id_addition=None, comp_custom_id_addition=None):
 
     """
     Parameters:
     -   database (str): The database to use for the analysis. Options are 'AR6' or 'sci', 
         others can be added.
-    -   start_year (int): The starting year for data used in the analysis.
+    -   start_year (int): The starting year for data used in the analysis. Due to data
+        availability, this needs to be at fixed decadal points ending in 0     
+    #to do item, allow compatibility with different time periods. 
     -   end_year (int): The ending year for data used in the analysis.
     -   data_for_diversity (DataFrame): The scenario data containing the variable data to
         be used. 
     -   default_sigma (bool): Whether to use the default sigma value for the analysis. 
         (default sigma setting can be adjusted in constants.py)
+    -   within_model (bool): Whether to calculate weights only within each model. 
+        Default is False.
     -   pairwise_override (bool): Whether to override the pairwise RMS distance file
         if it already exists. Default is False, meaning it will use the existing file as
         long as it exists.
@@ -44,6 +51,9 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
     -   specify_sigma (str or float): A specific sigma value to use for the analysis.
     -   custom_vars (list): A list of custom variables to use for the analysis. 
         If None, it will use the default tier 0 variables for the specified database.
+    -   composite_override (bool): Whether to override the composite diversity file if it already exists.
+    -   custom_id_addition (str): A custom identifier for the diversity weights (global across files)
+    -   comp_custom_id_addition (str): A custom identifier for the composite weights.
 
     Returns: files needed for complete diversity weighting process.
  
@@ -99,16 +109,17 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
     3a. Calculate variable weights based on default sigma value.
 
     """
+
     # check if variable weights file exists first
     if default_sigma or specify_sigma is not None:
-        if os.path.exists(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma.csv'):
+        if os.path.exists(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma{custom_id_addition}.csv'):
             logger.info(f"Variable weights file found for {database}"
                   f" with {sigma} sigma. Skipping calculation.")
         else:
             logger.info(f'Calculating variable weights for database {database} with {sigma} sigma...')
             pairwise_rms_df = read_csv(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv')
             sigma_values = sigmas_df[sigma].to_dict()
-            calculate_variable_weights(pairwise_rms_df, sigma_values, database, sigma + '_sigma', variables)
+            calculate_variable_weights(pairwise_rms_df, sigma_values, database, sigma + '_sigma' + custom_id_addition, variables)
     
     """
     3b. Calculate variable weights based on range of sigma values to understand 
@@ -129,7 +140,9 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
         else:
             sigmas = None
         calculate_range_variable_weights(pairwise_rms_df, sigmas_df, database, 
-                                        variables, sigmas=sigmas, sensitivity_override=sensitivity_override)
+                                        variables, sensitivity_override=sensitivity_override,
+                                        within_model=within_model,
+                                        sigmas=sigmas, custom_id_addition=custom_id_addition)
         logger.info('Establishing sigma value that provides greatest diversity '
               'for the database...')
         
@@ -153,17 +166,19 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
     and the group and sub-group weights to calculate a composite weight for each scenario.
     
     """
-    if os.path.exists(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma.csv'):
+    
+    
+    if os.path.exists(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma{custom_id_addition}.csv'):
         logger.info(f"Variable weights file found for {database}"
               f" with {sigma} sigma. Using this for composite weight calculation.")
-        scenario_variable_weights = read_csv(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma.csv')
-        if os.path.exists(DIVERSITY_DIR + f'composite_weights_{database}_{sigma}_sigma.csv'):
+        scenario_variable_weights = read_csv(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma{custom_id_addition}.csv')
+        if os.path.exists(DIVERSITY_DIR + f'composite_weights_{database}_{sigma}_sigma{custom_id_addition}{comp_custom_id_addition}.csv') and not composite_override:
             logger.info(f"Composite weights file found for {database}"
                   f" with {sigma} sigma. Skipping calculation.")
         else:
             logger.info(f'Calculating composite weights for database {database} with {sigma} sigma...')
             calculate_composite_weight(scenario_variable_weights, data_for_diversity, 
-                                       f'{database}_{sigma}_sigma', variable_info=variable_weights)
+                                       f'{database}_{sigma}_sigma{custom_id_addition}{comp_custom_id_addition}', variable_info=variable_weights)
 
     else:
         logger.warning(f"Variable weights file not found for {database} with {sigma} sigma.")
@@ -317,19 +332,21 @@ def run_database_segment_sensitivity(database_pairwise : pd.DataFrame,
 
 
 def calculate_range_variable_weights(database_pairwise, sigma_file, database, 
-                                     variables, sensitivity_override=False, 
-                                     sigmas=None):
+                                     variables, sensitivity_override=False,
+                                     within_model=False, 
+                                     sigmas=None, custom_id_addition=None):
 
     if sigmas is None:
         sigmas = ['min', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.7', '0.8', '0.9', 'max']
     for sigma in sigmas:
-        if os.path.exists(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma.csv') and not sensitivity_override:
+        if os.path.exists(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma{custom_id_addition}.csv') and not sensitivity_override:
             logger.info(f"Variable weights file found for {database} with {sigma} sigma. Skipping calculation.")
             continue
         else:
             sigma_values = sigma_file[sigma].to_dict()
             logger.info(f"Calculating variable weights for {sigma} sigma.")
-            calculate_variable_weights(database_pairwise, sigma_values, database, sigma + '_sigma', variables)
+            calculate_variable_weights(database_pairwise, sigma_values, database, sigma + '_sigma' + custom_id_addition, variables,
+                                       within_model=within_model)
             logger.info(f"Variable weights calculated for sigma {sigma}")
 
 
@@ -369,6 +386,8 @@ def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables, database):
 
     sigma_dict = {}
     
+    carbon_removal_var = 'Carbon Sequestration|CCS' if database == 'ar6' else 'Carbon Capture|Geological Storage' if database == 'sci' else None
+    baseline_skip_vars = ['Price|Carbon'] + [carbon_removal_var] if carbon_removal_var else ['Price|Carbon']
     # Iterate over each variable to calculate sigma values
     for variable in tqdm(variables, desc="Calculating sigma values"):
         # Subset data for this variable
@@ -379,7 +398,7 @@ def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables, database):
         
         for ssp in ssp_scenarios:
             
-            if 'Baseline' in ssp and variable in ['Price|Carbon', 'Carbon Sequestration|CCS']:
+            if 'Baseline' in ssp and variable in baseline_skip_vars:
                 continue
             
             ssp_subset = variable_data[variable_data['Scenario'] == ssp]
@@ -436,7 +455,7 @@ def calculate_sigma_SSP_RCP(data, ssp_scenarios, variables, database):
 
 # Function that reweights the scenarios based on the pairwise RMS distances and the sigma input
 def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id, 
-                               variables):
+                               variables, within_model=False):
 
     """
     Calculate weights for each variable and scenario based on pairwise RMS distances and sigma values.
@@ -446,6 +465,7 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id,
         sigmas (dict): Dictionary containing sigma values for each variable.
         database (str): The database to use for the analysis
         output_id (str): Identifier for the output file.
+        within_model (bool): Whether to calculate weights only within each model.
 
     Returns:
         DataFrame: A DataFrame containing the scenarios and their weights for each variable
@@ -453,6 +473,16 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id,
     
     """
     results = []
+
+    if within_model:
+        if os.path.exists(INPUT_DIR + 'model_family.csv'):
+            model_family_df = read_csv(INPUT_DIR + 'model_family.csv')
+            model_to_family = dict(zip(model_family_df['Model'], model_family_df['Model_family']))
+        else:
+            logger.warning("Model family file not found. Cannot perform within-model weighting.\n" \
+            "Please ensure model_family.csv is in the inputs/ directory with columns 'Model' and 'Family'.")
+            return None
+
 
     # Get all unique scenario-model pairs from the dataframe
     model_scen_set = set(
@@ -463,7 +493,14 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id,
     index = {pair: i for i, pair in enumerate(model_scen_list)}
     n = len(model_scen_list)
 
-    # Unique variable (may vary depending on the database)
+    # If within_model is True, create a matrix to identify which pairs belong to the same model family
+    if within_model:
+        try:
+            model_families = np.array([model_to_family[m] for (m, s) in model_scen_list])
+        except KeyError as e:
+            raise ValueError(f"Model '{e.args[0]}' not found in model-family mapping sheet.") from None
+        same_family = model_families[:, None] == model_families[None, :]
+
 
     # loop through each variable 
     for variable in tqdm(variables, desc="Calculating weights by variable"):
@@ -480,12 +517,22 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id,
         dist_matrix[idx_j, idx_i] = var_df['RMS_Distance'].values  
 
         # Apply weighting for variable, ignore the diagonal (i ≠ j)
-        mask = ~np.eye(n, dtype=bool) & ~np.isnan(dist_matrix)
+        mask = (
+            ~np.eye(n, dtype=bool) & ~np.isnan(dist_matrix) 
+            # if within_model, mask also to only include within model family.
+            if not within_model else 
+              ~np.eye(n, dtype=bool) & ~np.isnan(dist_matrix) & same_family
+        )
         similarity_matrix = np.zeros((n, n))
         similarity_matrix[mask] = np.exp(-np.square(dist_matrix[mask]) / variable_sigma**2)
 
         raw_weights = similarity_matrix.sum(axis=1)  # sum of the weights for each scenario from each pairing
 
+        if within_model:
+            # normalise the weights within each model family group
+            raw_weights = raw_weights / (same_family.sum(axis=1) - 1)
+            # to do: add error if only 1 scenario from model family
+        
         for i, (model, scen) in enumerate(model_scen_list):
             results.append({
                 'Model': model,
@@ -505,7 +552,7 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id,
 # combines the weights from each of the variables using the group and sub-group weights
 def calculate_composite_weight(weighting_data_file, 
                                original_scenario_data, 
-                               output_id, variable_info=VARIABLE_INFO,
+                               output_id, variable_info,
                                flat_weights=None, output_dir=DIVERSITY_DIR):
 
     """
@@ -574,6 +621,7 @@ def calculate_composite_weight(weighting_data_file,
         else:
             variable_df = default_variable_df.copy()
 
+
         scenario_weighting_data = scenario_weighting_data.merge(
             variable_df[['Variable', 'variable_weight']],
             on='Variable',
@@ -614,7 +662,6 @@ def calculate_composite_weight(weighting_data_file,
 
 # function that provides a new set of weights for the scenarios that are missing variables
 def adjust_weights_for_missing_variables(missing_variables, variable_info):
-    
     """
     Function returns new group and sub-group weights for the scenario
 
@@ -626,37 +673,47 @@ def adjust_weights_for_missing_variables(missing_variables, variable_info):
     variable_info (dict): A new dictionary with adjusted weights for the variables that are missing.
 
     """
-    variable_info = copy.deepcopy(variable_info)  # make a copy of the variable info to avoid modifying the original
+    variable_info = copy.deepcopy(variable_info)
     groups = set(variable_info[var]['group'] for var in variable_info)
     
     for variable in missing_variables:
-        del variable_info[variable]
+        if variable in variable_info:
+            del variable_info[variable]
 
-    # Adjusting the group weights first
-    missing_groups = 0
-    for group in groups:
-        
-        # Adjusting the group weights if a group is missing variables
+    # Determine which groups still have variables
+    remaining_groups = set(variable_info[var]['group'] for var in variable_info)
+    n_remaining_groups = len(remaining_groups)
+
+    if n_remaining_groups == 0:
+        logger.warning("All groups are missing. Cannot adjust weights.")
+        return variable_info
+
+    # Update group weights for all remaining variables
+    for var in variable_info:
+        variable_info[var]['group_weight'] = 1 / n_remaining_groups
+
+    # Adjust subgroup weights within each remaining group
+    for group in remaining_groups:
         group_variables = [var for var in variable_info if variable_info[var]['group'] == group]
-        if not group_variables:
-            missing_groups += 1
-            for var in variable_info:
-                variable_info[var]['group_weight'] = 1 / (len(groups) - missing_groups)
-            # del groups[group]  # remove the group from the set of groups        
-
-        # Adjusting the subgroup weights if group exists but subgroup weights don't sum to 1
-        else:
-            subgroup_weights = [variable_info[var]['subgroup_weight'] for var in group_variables]
-            if not np.isclose(sum(subgroup_weights), 1.0):
-                for var in group_variables:
-                    variable_info[var]['subgroup_weight'] = variable_info[var]['subgroup_weight'] / (sum(subgroup_weights) + 1e-8)
+        subgroup_weight_sum = sum(variable_info[var]['subgroup_weight'] for var in group_variables)
+        
+        if not np.isclose(subgroup_weight_sum, 1.0) and subgroup_weight_sum > 0:
+            for var in group_variables:
+                variable_info[var]['subgroup_weight'] = variable_info[var]['subgroup_weight'] / subgroup_weight_sum
 
     return variable_info
 
 
+
+
+# 
+
+
+
+
+
 # function that determines the sigma value for the greatest diversity (IQR)
 def determine_sigma_greatest_diversity(database, sigma_values, variables):
-
     """
     Function that runs through each dataframe with different sigma values, calculates
     the **normalised IQR for each variable**, calculates the mean IQR for the set and 
@@ -678,25 +735,27 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
 
         # open the relevant pairwise RMS distances file
         sigma_df = read_csv(DIVERSITY_DIR + f"variable_weights_{database}_{sigma}_sigma.csv")
-        variables = sigma_df['Variable'].unique().tolist()
+        current_variables = sigma_df['Variable'].unique().tolist()
 
         iqrs = []
         # Loop through each variable
-        for variable in variables:
+        for variable in current_variables:
             variable_df = sigma_df[sigma_df['Variable'] == variable]
             # get the IQR of the weights
             iqrs.append(variable_df['Weight'].quantile(0.75) - variable_df['Weight'].quantile(0.25))
-                        
+
         # Calculate the mean IQR for the set
-        mean_iqr = np.mean(iqrs) 
-        iqrs.append(mean_iqr)
-        variables.append('mean')
+        mean_iqr = np.mean(iqrs)
+
+        # Build output lists without mutating current_variables
+        out_variables = current_variables + ['mean']
+        out_iqrs = iqrs + [mean_iqr]
 
         # concat the results to the stats DataFrame
         stats = pd.concat([stats, pd.DataFrame({
-            'Variable': variables,
-            'Sigma': [sigma] * len(variables),
-            'IQR': iqrs,
+            'Variable': out_variables,
+            'Sigma': [sigma] * len(out_variables),
+            'IQR': out_iqrs,
         })], ignore_index=True)
 
     # Save the stats DataFrame to a CSV file
@@ -705,7 +764,8 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
 
 
 # Determine variable weights based on their correlation with each other
-def get_variable_correlation_matrix(variable_data, variables, output_id): 
+def get_variable_correlation_matrix(variable_data, variables, output_id, 
+                                    category_correlation=False): 
    
     """
     This function performs analysis assessing the correlation for each of our 15 variables, for each scenario. 
@@ -740,7 +800,10 @@ def get_variable_correlation_matrix(variable_data, variables, output_id):
         raise TypeError("Output ID must be a string.")
     
     # Check for required columns
-    required_columns = ['Scenario', 'Model', 'Variable', 'Category']
+    if category_correlation:
+        required_columns = ['Scenario', 'Model', 'Variable', 'Category']
+    else:
+        required_columns = ['Scenario', 'Model', 'Variable']
     year_columns = [str(y) for y in range(2020, 2101, 10)]
     
     if not all(col in variable_data.columns for col in required_columns + year_columns):
@@ -756,9 +819,11 @@ def get_variable_correlation_matrix(variable_data, variables, output_id):
     scenario_categories = {}      
 
     for scenario_key, group in tqdm(scenario_groups):
-        category = group['Category'].iloc[0]
-        scenario_categories[scenario_key] = category
-
+        
+        if category_correlation:
+            category = group['Category'].iloc[0]
+            scenario_categories[scenario_key] = category
+        
         # Create a matrix: rows = years, columns = variables
         var_data = group.set_index('Variable')[year_columns].T  # Now rows=years, columns=variables
 
@@ -774,22 +839,23 @@ def get_variable_correlation_matrix(variable_data, variables, output_id):
     # Combine all correlations and compute global average
     all_corrs = pd.concat(scenario_corrs.values(), keys=scenario_corrs.keys())
     mean_corr = all_corrs.groupby(level=1).mean()
-    mean_corr.to_csv(os.path.join(OUTPUT_DIR, f'variable_correlation_matrix_{output_id}_GLOBAL.csv'))
+    mean_corr.to_csv(os.path.join(DIVERSITY_DIR, f'variable_correlation_matrix_{output_id}_GLOBAL.csv'))
 
-    # Compute category-specific means
-    category_corrs = {}
-    for scenario_key, corr in scenario_corrs.items():
-        category = scenario_categories[scenario_key]
-        category_corrs.setdefault(category, []).append(corr)
+    if category_correlation:
+        # Compute category-specific means
+        category_corrs = {}
+        for scenario_key, corr in scenario_corrs.items():
+            category = scenario_categories[scenario_key]
+            category_corrs.setdefault(category, []).append(corr)
 
-    mean_corrs_by_category = {}
-    for category, corr_list in category_corrs.items():
-        aligned_corrs = pd.concat(corr_list, keys=range(len(corr_list)))
-        mean_corr_cat = aligned_corrs.groupby(level=1).mean()
-        mean_corrs_by_category[category] = mean_corr_cat
+        mean_corrs_by_category = {}
+        for category, corr_list in category_corrs.items():
+            aligned_corrs = pd.concat(corr_list, keys=range(len(corr_list)))
+            mean_corr_cat = aligned_corrs.groupby(level=1).mean()
+            mean_corrs_by_category[category] = mean_corr_cat
 
-        filename = f'variable_correlation_matrix_{output_id}_CATEGORY_{category.replace(" ", "_")}.csv'
-        mean_corr_cat.to_csv(os.path.join(OUTPUT_DIR, filename))
+            filename = f'variable_correlation_matrix_{output_id}_CATEGORY_{category.replace(" ", "_")}.csv'
+            mean_corr_cat.to_csv(os.path.join(DIVERSITY_DIR, filename))
 
     return scenario_corrs
 
@@ -848,9 +914,9 @@ def get_snapshot_variable_correlation(variable_data, variables, output_id):
     aligned_corrs = pd.concat(yearly_corrs.values(), keys=yearly_corrs.keys())
     mean_corr = aligned_corrs.groupby(level=1).mean()
 
-    mean_corr.to_csv(os.path.join(OUTPUT_DIR, f'variable_correlation_matrix_{output_id}_SNAPSHOT.csv'))
+    mean_corr.to_csv(os.path.join(DIVERSITY_DIR, f'variable_correlation_matrix_{output_id}_SNAPSHOT.csv'))
     yearly_corrs_df = pd.concat(yearly_corrs, axis=0)
-    yearly_corrs_df.to_csv(os.path.join(OUTPUT_DIR, f'variable_correlation_matrix_{output_id}_SNAPSHOT_YEARLY.csv'))
+    yearly_corrs_df.to_csv(os.path.join(DIVERSITY_DIR, f'variable_correlation_matrix_{output_id}_SNAPSHOT_YEARLY.csv'))
     return mean_corr, yearly_corrs
 
 
@@ -900,7 +966,7 @@ def compute_weights_flat(corr_matrix):
     return weights.to_dict()
  
 
-def run_hierarchical_clustering(corr_matrix, threshold=0.5):
+def run_hierarchical_clustering(corr_matrix, threshold=0.5, plot_dendrogram=False):
     """
     Perform hierarchical clustering on the variable correlation matrix
     
@@ -924,6 +990,16 @@ def run_hierarchical_clustering(corr_matrix, threshold=0.5):
     clusters = {}
     for var, label in zip(corr_matrix.columns, cluster_labels):
         clusters.setdefault(label, []).append(var)
+
+    # Plot dendrogram if requested
+    if plot_dendrogram:
+        from scipy.cluster.hierarchy import dendrogram
+        plt.figure(figsize=(10, 6))
+        dendrogram(linkage_matrix, labels=corr_matrix.columns, leaf_rotation=90)
+        plt.xlabel('Variables')
+        plt.ylabel('Distance')
+        plt.title('Hierarchical Clustering Dendrogram')
+        plt.show()
 
     return list(clusters.values())
 
