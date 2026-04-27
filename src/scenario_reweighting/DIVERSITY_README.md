@@ -77,6 +77,8 @@ Orchestrates the full diversity weighting pipeline.
 | `sensitivity_override` | `bool` | Force recalculation of variable weights across sigma range. |
 | `specify_sigma` | `str` or `float` | Use a specific sigma value. |
 | `custom_vars` | `list` | Custom list of variables (defaults to tier-0 variables for the database). |
+| `diversity_mode` | `str` or `None` | `model_agnostic`, `model_separate`, or `hybrid`. If `None`, falls back to `within_model`. |
+| `sigma_selection_level` | `str` | `variable` for the historical selector, or `composite` to choose the sigma with the largest final composite-weight IQR. |
 
 ---
 
@@ -123,6 +125,8 @@ $$w_i^{\text{raw}} = \sum_{j \neq i} S_{ij}$$
 
 Weights are normalised per variable so they sum to 1.
 
+If `diversity_mode='model_separate'`, the similarity matrix is masked so scenarios are only compared against other scenarios in the same model family. In the current code this uses `model_family.csv`, so this is model-family-separate weighting rather than strict model-identity weighting.
+
 - **Output**: CSV at `outputs/diversity/variable_weights_{database}_{output_id}.csv`.
 
 #### `calculate_range_variable_weights(database_pairwise, sigma_file, database, variables, ...)`
@@ -145,6 +149,21 @@ After aggregation, weights are **rank-inverted** (high similarity → low divers
 
 - **Output**: CSV at `outputs/diversity/composite_weights_{output_id}.csv` with columns `Scenario`, `Model`, `Weight`, `Weighting_id`.
 
+### Hybrid Diversity Mode
+
+The hybrid mode blends the two completed diversity distributions after each has already been converted to a final composite probability distribution:
+
+$$w_i^{hybrid} = 0.5 \cdot w_i^{model\_separate} + 0.5 \cdot w_i^{model\_agnostic}$$
+
+Because both parent distributions already sum to 1, the hybrid is also a valid probability distribution, though the code renormalises after blending for numerical safety.
+
+This mode is intended as a compromise between two interpretations of redundancy:
+
+- **Model-separate**: similar scenarios from different model families can reflect consensus rather than duplication.
+- **Model-agnostic**: very similar scenarios may still be redundant even if they come from different model families.
+
+The hybrid does **not** guarantee larger variance in final weights. In practice it should be treated as an explicit compromise distribution whose spread should be checked empirically against the two source modes.
+
 ---
 
 ## Auxiliary Functions
@@ -164,6 +183,16 @@ Returns a modified copy of the `variable_info` dictionary with group and subgrou
 Evaluates which sigma value produces the greatest spread (IQR) in variable weights across the ensemble. The sigma with the highest median IQR across all variables is selected as optimal.
 
 - **Output**: CSV at `outputs/diversity/sigma_greatest_diversity_{database}.csv`.
+
+#### `determine_sigma_greatest_composite_diversity(database, sigma_values, data_for_diversity, variables, variable_weights, diversity_mode)`
+
+Optional sigma selector that runs the full composite-weighting pipeline for each sigma value, then selects the sigma whose final composite `Weight` distribution has the largest IQR.
+
+- `model_agnostic`: computes composite weights directly from the model-agnostic variable weights for each sigma.
+- `model_separate`: computes composite weights from the `_within_model` variable-weight files and preserves the existing suffix convention.
+- `hybrid`: computes both parent composite distributions for each sigma, blends them into the `_hybrid_equal` distribution, and ranks sigma values using the blended IQR.
+
+- **Output**: CSV at `outputs/diversity/sigma_greatest_composite_diversity_{database}.csv`.
 
 ---
 

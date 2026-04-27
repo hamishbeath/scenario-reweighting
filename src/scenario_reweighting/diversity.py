@@ -15,6 +15,9 @@ import matplotlib.pyplot as plt
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+DIVERSITY_MODES = {'model_agnostic', 'model_separate', 'hybrid'}
+SIGMA_SELECTION_LEVELS = {'variable', 'composite'}
+
 # Ensure output is visible even if no handler is configured upstream
 if not logger.handlers:
     _handler = logging.StreamHandler()
@@ -22,11 +25,404 @@ if not logger.handlers:
     logger.addHandler(_handler)
 
 
+def _append_unique_suffix(base_suffix, suffix):
+    base_suffix = base_suffix or ''
+    if not suffix or base_suffix.endswith(suffix):
+        return base_suffix
+    return f'{base_suffix}{suffix}'
+
+
+def _resolve_diversity_mode(diversity_mode, within_model):
+    if diversity_mode is None:
+        return 'model_separate' if within_model else 'model_agnostic'
+    if diversity_mode not in DIVERSITY_MODES:
+        raise ValueError(
+            f"Unsupported diversity mode '{diversity_mode}'. "
+            f"Choose from {sorted(DIVERSITY_MODES)}."
+        )
+    return diversity_mode
+
+
+def _resolve_sigma_selection_level(sigma_selection_level):
+    if sigma_selection_level not in SIGMA_SELECTION_LEVELS:
+        raise ValueError(
+            f"Unsupported sigma selection level '{sigma_selection_level}'. "
+            f"Choose from {sorted(SIGMA_SELECTION_LEVELS)}."
+        )
+    return sigma_selection_level
+
+
+def _variable_weights_path(database, sigma, custom_id_addition=''):
+    return DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma{custom_id_addition}.csv'
+
+
+def _composite_weights_path(database, sigma, custom_id_addition='', comp_custom_id_addition=''):
+    return DIVERSITY_DIR + f'composite_weights_{database}_{sigma}_sigma{custom_id_addition}{comp_custom_id_addition}.csv'
+
+
+def _sigma_diversity_path(database, output_id=''):
+    return DIVERSITY_DIR + f'sigma_greatest_diversity_{database}{output_id}.csv'
+
+
+def _composite_sigma_diversity_path(database, output_id=''):
+    return DIVERSITY_DIR + f'sigma_greatest_composite_diversity_{database}{output_id}.csv'
+
+
+def _validate_probability_distribution(weighting_data, label):
+    total_weight = weighting_data['Weight'].sum()
+    if not np.isclose(total_weight, 1.0, atol=1e-8):
+        raise ValueError(
+            f'{label} weights must sum to 1. Found total weight of {total_weight:.10f}.'
+        )
+
+
+def blend_composite_weights(model_separate_weights, model_agnostic_weights,
+                            output_id, alpha=0.5, output_dir=DIVERSITY_DIR):
+
+    """
+    Blend two final diversity weight distributions into a hybrid distribution.
+
+    Inputs:
+        model_separate_weights (DataFrame): Composite weights generated using
+            model-family-separate weighting.
+        model_agnostic_weights (DataFrame): Composite weights generated using
+            model-agnostic weighting.
+        output_id (str): Identifier appended to the hybrid output file.
+        alpha (float): Weight given to the model-separate distribution.
+        output_dir (str | None): Directory to write the output file to. If None,
+            no file is written.
+
+    Returns:
+        DataFrame: Hybrid composite weights with the standard output schema.
+    """
+
+    if not 0 <= alpha <= 1:
+        raise ValueError('alpha must be between 0 and 1 inclusive.')
+
+    required_columns = {'Model', 'Scenario', 'Weight'}
+    for label, weighting_data in {
+        'Model-separate': model_separate_weights,
+        'Model-agnostic': model_agnostic_weights,
+    }.items():
+        missing_columns = required_columns - set(weighting_data.columns)
+        if missing_columns:
+            raise ValueError(
+                f'{label} weights are missing required columns: {sorted(missing_columns)}'
+            )
+        _validate_probability_distribution(weighting_data, label)
+
+    model_separate_pairs = set(
+        tuple(x) for x in model_separate_weights[['Model', 'Scenario']].to_numpy()
+    )
+    model_agnostic_pairs = set(
+        tuple(x) for x in model_agnostic_weights[['Model', 'Scenario']].to_numpy()
+    )
+    if model_separate_pairs != model_agnostic_pairs:
+        missing_in_agnostic = sorted(model_separate_pairs - model_agnostic_pairs)
+        missing_in_separate = sorted(model_agnostic_pairs - model_separate_pairs)
+        raise ValueError(
+            'Hybrid weights require identical Model/Scenario coverage. '
+            f'Missing in model-agnostic: {missing_in_agnostic[:5]}; '
+            f'Missing in model-separate: {missing_in_separate[:5]}'
+        )
+
+    merged = model_separate_weights[['Model', 'Scenario', 'Weight']].merge(
+        model_agnostic_weights[['Model', 'Scenario', 'Weight']],
+        on=['Model', 'Scenario'],
+        how='inner',
+        validate='1:1',
+        suffixes=('_model_separate', '_model_agnostic')
+    )
+    merged['Weight'] = (
+        alpha * merged['Weight_model_separate'] +
+        (1 - alpha) * merged['Weight_model_agnostic']
+    )
+
+    total_weight = merged['Weight'].sum()
+    if total_weight <= 0:
+        raise ValueError('Hybrid weights must sum to a positive value before normalisation.')
+
+    merged['Weight'] = merged['Weight'] / total_weight
+    output_df = merged[['Scenario', 'Model', 'Weight']].copy()
+    output_df['Weighting_id'] = output_id
+
+    if output_dir is not None:
+        output_df.to_csv(output_dir + f'composite_weights_{output_id}.csv', index=False)
+    return output_df
+
+
+def compare_diversity_mode_weights(weighting_runs, baseline_mode='model_agnostic'):
+
+    """
+    Compare final diversity weight distributions across multiple diversity modes.
+
+    Inputs:
+        weighting_runs (dict[str, DataFrame]): Mapping of mode name to composite
+            weight dataframe.
+        baseline_mode (str): Mode used as the reference for rank shifts.
+
+    Returns:
+        tuple[DataFrame, DataFrame]:
+            - summary_df: one row per mode with spread statistics
+            - rank_df: aligned scenario-level weights, ranks, and rank shifts
+    """
+
+    if not weighting_runs:
+        raise ValueError('weighting_runs must contain at least one mode.')
+    if baseline_mode not in weighting_runs:
+        raise ValueError(f"Baseline mode '{baseline_mode}' is not present in weighting_runs.")
+
+    required_columns = {'Model', 'Scenario', 'Weight'}
+    mode_pairs = {}
+    summary_rows = []
+    merged = None
+
+    for mode, weighting_data in weighting_runs.items():
+        missing_columns = required_columns - set(weighting_data.columns)
+        if missing_columns:
+            raise ValueError(
+                f"Mode '{mode}' is missing required columns: {sorted(missing_columns)}"
+            )
+        _validate_probability_distribution(weighting_data, mode)
+
+        scenario_pairs = set(tuple(x) for x in weighting_data[['Model', 'Scenario']].to_numpy())
+        mode_pairs[mode] = scenario_pairs
+
+        weights = weighting_data['Weight'].to_numpy(dtype=float)
+        summary_rows.append(
+            {
+                'Mode': mode,
+                'Scenario Count': len(weighting_data),
+                'Mean Weight': float(np.mean(weights)),
+                'Min Weight': float(np.min(weights)),
+                'Max Weight': float(np.max(weights)),
+                'Std Weight': float(np.std(weights)),
+                'IQR': float(np.quantile(weights, 0.75) - np.quantile(weights, 0.25)),
+                'Effective Scenarios': float(1 / np.sum(np.square(weights))),
+            }
+        )
+
+        mode_frame = weighting_data[['Model', 'Scenario', 'Weight']].copy()
+        mode_frame = mode_frame.rename(columns={'Weight': f'Weight_{mode}'})
+        merged = mode_frame if merged is None else merged.merge(
+            mode_frame,
+            on=['Model', 'Scenario'],
+            how='inner',
+            validate='1:1',
+        )
+
+    reference_pairs = mode_pairs[baseline_mode]
+    for mode, scenario_pairs in mode_pairs.items():
+        if scenario_pairs != reference_pairs:
+            raise ValueError(
+                'All modes must contain identical Model/Scenario coverage for comparison.'
+            )
+
+    if len(merged) != len(reference_pairs):
+        raise ValueError('Merged comparison data lost scenarios during alignment.')
+
+    for mode in weighting_runs:
+        weight_column = f'Weight_{mode}'
+        rank_column = f'Rank_{mode}'
+        merged[rank_column] = merged[weight_column].rank(method='dense', ascending=False).astype(int)
+
+    baseline_rank_column = f'Rank_{baseline_mode}'
+    for mode in weighting_runs:
+        if mode == baseline_mode:
+            continue
+        merged[f'Rank Shift vs {baseline_mode} ({mode})'] = (
+            merged[f'Rank_{mode}'] - merged[baseline_rank_column]
+        )
+
+    summary_df = pd.DataFrame(summary_rows).sort_values('Mode').reset_index(drop=True)
+    rank_df = merged.sort_values(baseline_rank_column).reset_index(drop=True)
+    return summary_df, rank_df
+
+
+def _run_single_diversity_mode(database, sigma, data_for_diversity, variables,
+                               variable_weights, within_model=False,
+                               composite_override=False, custom_id_addition='',
+                               comp_custom_id_addition=''):
+    variable_weights_path = _variable_weights_path(database, sigma, custom_id_addition)
+
+    if os.path.exists(variable_weights_path):
+        logger.info(f"Variable weights file found for {database} with {sigma} sigma. Skipping calculation.")
+    else:
+        logger.info(f'Calculating variable weights for database {database} with {sigma} sigma...')
+        pairwise_rms_df = read_csv(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv')
+        sigmas_df = read_csv(DIVERSITY_DIR + f'sigma_values_{database}.csv').set_index('Variable')
+        sigma_values = sigmas_df[sigma].to_dict()
+        calculate_variable_weights(
+            pairwise_rms_df,
+            sigma_values,
+            database,
+            sigma + '_sigma' + custom_id_addition,
+            variables,
+            within_model=within_model,
+        )
+
+    if not os.path.exists(variable_weights_path):
+        logger.warning(f"Variable weights file not found for {database} with {sigma} sigma.")
+        logger.warning('Please ensure variable weights file is in place or run the variable weight calculation step with the desired sigma value.')
+        return None
+
+    output_path = _composite_weights_path(
+        database,
+        sigma,
+        custom_id_addition,
+        comp_custom_id_addition,
+    )
+    if os.path.exists(output_path) and not composite_override:
+        logger.info(f"Composite weights file found for {database} with {sigma} sigma. Skipping calculation.")
+        return read_csv(output_path)
+
+    logger.info(f'Calculating composite weights for database {database} with {sigma} sigma...')
+    scenario_variable_weights = read_csv(variable_weights_path)
+    return calculate_composite_weight(
+        scenario_variable_weights,
+        data_for_diversity,
+        f'{database}_{sigma}_sigma{custom_id_addition}{comp_custom_id_addition}',
+        variable_info=variable_weights,
+        nan_replace=True,
+    )
+
+
+def _run_diversity_mode_for_sigma(database, sigma, data_for_diversity, variables,
+                                  variable_weights, diversity_mode,
+                                  composite_override=False, custom_id_addition='',
+                                  comp_custom_id_addition=''):
+    if diversity_mode == 'hybrid':
+        model_agnostic_weights = _run_single_diversity_mode(
+            database,
+            sigma,
+            data_for_diversity,
+            variables,
+            variable_weights,
+            within_model=False,
+            composite_override=composite_override,
+            custom_id_addition=custom_id_addition,
+            comp_custom_id_addition=comp_custom_id_addition,
+        )
+        model_separate_weights = _run_single_diversity_mode(
+            database,
+            sigma,
+            data_for_diversity,
+            variables,
+            variable_weights,
+            within_model=True,
+            composite_override=composite_override,
+            custom_id_addition=_append_unique_suffix(custom_id_addition, '_within_model'),
+            comp_custom_id_addition=comp_custom_id_addition,
+        )
+
+        if model_agnostic_weights is None or model_separate_weights is None:
+            return None
+
+        hybrid_custom_id = _append_unique_suffix(custom_id_addition, '_hybrid_equal')
+        hybrid_output_path = _composite_weights_path(
+            database,
+            sigma,
+            hybrid_custom_id,
+            comp_custom_id_addition,
+        )
+        if os.path.exists(hybrid_output_path) and not composite_override:
+            logger.info(f"Hybrid composite weights file found for {database} with {sigma} sigma. Skipping calculation.")
+            return read_csv(hybrid_output_path)
+
+        return blend_composite_weights(
+            model_separate_weights,
+            model_agnostic_weights,
+            f'{database}_{sigma}_sigma{hybrid_custom_id}{comp_custom_id_addition}',
+        )
+
+    mode_custom_id = custom_id_addition
+    if diversity_mode == 'model_separate':
+        mode_custom_id = _append_unique_suffix(custom_id_addition, '_within_model')
+    return _run_single_diversity_mode(
+        database,
+        sigma,
+        data_for_diversity,
+        variables,
+        variable_weights,
+        within_model=(diversity_mode == 'model_separate'),
+        composite_override=composite_override,
+        custom_id_addition=mode_custom_id,
+        comp_custom_id_addition=comp_custom_id_addition,
+    )
+
+
+def calculate_range_composite_weights(database, sigma_values, data_for_diversity,
+                                      variables, variable_weights, diversity_mode,
+                                      composite_override=False,
+                                      custom_id_addition='',
+                                      comp_custom_id_addition=''):
+    composite_weights = {}
+    for sigma in sigma_values:
+        composite_weights[sigma] = _run_diversity_mode_for_sigma(
+            database,
+            sigma,
+            data_for_diversity,
+            variables,
+            variable_weights,
+            diversity_mode,
+            composite_override=composite_override,
+            custom_id_addition=custom_id_addition,
+            comp_custom_id_addition=comp_custom_id_addition,
+        )
+    return composite_weights
+
+
+def determine_sigma_greatest_composite_diversity(database, sigma_values,
+                                                 data_for_diversity, variables,
+                                                 variable_weights, diversity_mode,
+                                                 composite_override=False,
+                                                 output_id='',
+                                                 comp_custom_id_addition=''):
+    stats = []
+    composite_weights = calculate_range_composite_weights(
+        database,
+        sigma_values,
+        data_for_diversity,
+        variables,
+        variable_weights,
+        diversity_mode,
+        composite_override=composite_override,
+        custom_id_addition=output_id,
+        comp_custom_id_addition=comp_custom_id_addition,
+    )
+
+    for sigma, sigma_df in composite_weights.items():
+        if sigma_df is None or sigma_df.empty:
+            continue
+        weights = sigma_df['Weight']
+        stats.append(
+            {
+                'Sigma': sigma,
+                'IQR': float(weights.quantile(0.75) - weights.quantile(0.25)),
+                'Mean Weight': float(weights.mean()),
+                'Min Weight': float(weights.min()),
+                'Max Weight': float(weights.max()),
+                'Scenario Count': int(len(sigma_df)),
+                'Mode': diversity_mode,
+            }
+        )
+
+    stats_df = pd.DataFrame(stats)
+    stats_df.to_csv(_composite_sigma_diversity_path(database, output_id), index=False)
+    return stats_df
+
+
+def _select_sigma_from_stats(sigma_stats):
+    sigma_group = sigma_stats.groupby('Sigma')['IQR'].median().reset_index()
+    return sigma_group.loc[sigma_group['IQR'].idxmax(), 'Sigma']
+
+
 def main(database: str, start_year, end_year, data_for_diversity, default_sigma=False,
          within_model=False,
          pairwise_override=False, sigma_override=False, sensitivity_override=False, 
          composite_override=False, specify_sigma=None, custom_vars=None, variable_weights=None,
-         custom_id_addition=None, comp_custom_id_addition=None):
+         custom_id_addition='', comp_custom_id_addition='', diversity_mode=None,
+         sigma_selection_level='variable'):
 
     """
     Parameters:
@@ -54,6 +450,11 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
     -   composite_override (bool): Whether to override the composite diversity file if it already exists.
     -   custom_id_addition (str): A custom identifier for the diversity weights (global across files)
     -   comp_custom_id_addition (str): A custom identifier for the composite weights.
+    -   diversity_mode (str | None): One of 'model_agnostic', 'model_separate', or
+        'hybrid'. If None, falls back to the historical within_model boolean.
+    -   sigma_selection_level (str): One of 'variable' or 'composite'. Controls
+        whether sigma sensitivity selects the sigma with the highest variable-level
+        median IQR or the highest final composite weight IQR.
 
     Returns: files needed for complete diversity weighting process.
  
@@ -65,6 +466,8 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
 
     """
     variables = custom_vars if custom_vars is not None else TIER_0_VARIABLES_AR6 if database == 'ar6' else TIER_0_VARIABLES_SCI
+    diversity_mode = _resolve_diversity_mode(diversity_mode, within_model)
+    sigma_selection_level = _resolve_sigma_selection_level(sigma_selection_level)
     if variable_weights is None:
         logger.info(DEFAULT_VARS)
         variable_weights = VARIABLE_INFO if database == 'ar6' else VARIABLE_INFO_SCI
@@ -119,7 +522,9 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
             logger.info(f'Calculating variable weights for database {database} with {sigma} sigma...')
             pairwise_rms_df = read_csv(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv')
             sigma_values = sigmas_df[sigma].to_dict()
-            calculate_variable_weights(pairwise_rms_df, sigma_values, database, sigma + '_sigma' + custom_id_addition, variables)
+            calculate_variable_weights(pairwise_rms_df, sigma_values, 
+                                       database, sigma + '_sigma' + custom_id_addition, variables,
+                                       within_model=within_model)
     
     """
     3b. Calculate variable weights based on range of sigma values to understand 
@@ -139,22 +544,50 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
             sigmas = SIGMAS_SCI
         else:
             sigmas = None
+        sensitivity_custom_id = custom_id_addition
+        sensitivity_within_model = False
+        if diversity_mode == 'model_separate':
+            sensitivity_custom_id = _append_unique_suffix(custom_id_addition, '_within_model')
+            sensitivity_within_model = True
+        elif diversity_mode == 'hybrid' and sigma_selection_level == 'variable':
+            logger.info('Hybrid mode selects sigma using the model-agnostic sensitivity run.')
         calculate_range_variable_weights(pairwise_rms_df, sigmas_df, database, 
                                         variables, sensitivity_override=sensitivity_override,
-                                        within_model=within_model,
-                                        sigmas=sigmas, custom_id_addition=custom_id_addition)
+                                        within_model=sensitivity_within_model,
+                                        sigmas=sigmas, custom_id_addition=sensitivity_custom_id)
         logger.info('Establishing sigma value that provides greatest diversity '
               'for the database...')
         
         try:
-            if os.path.exists(DIVERSITY_DIR + f'sigma_greatest_diversity_{database}.csv'):
-                logger.info(f"Sigma greatest diversity stats file found for database {database}. Skipping calculation.")
-                sigma_stats = read_csv(DIVERSITY_DIR + f'sigma_greatest_diversity_{database}.csv')
+            if sigma_selection_level == 'composite':
+                sigma_stats_path = _composite_sigma_diversity_path(database, sensitivity_custom_id)
+                if os.path.exists(sigma_stats_path):
+                    logger.info(f"Composite sigma diversity stats file found for database {database}. Skipping calculation.")
+                    sigma_stats = read_csv(sigma_stats_path)
+                else:
+                    sigma_stats = determine_sigma_greatest_composite_diversity(
+                        database,
+                        sigmas,
+                        data_for_diversity,
+                        variables,
+                        variable_weights,
+                        diversity_mode,
+                        composite_override=composite_override,
+                        output_id=sensitivity_custom_id,
+                        comp_custom_id_addition=comp_custom_id_addition,
+                    )
             else:
-                sigma_stats = determine_sigma_greatest_diversity(database, sigmas, variables)
-            sigma_group = (sigma_stats.groupby('Sigma')['IQR'].median().reset_index())
-            sigma = sigma_group.loc[sigma_group['IQR'].idxmax(), 'Sigma']
-            logger.info(f"Sigma value of {sigma} gives highest median IQR for weights across variables {database} database.")
+                sigma_stats_path = _sigma_diversity_path(database, sensitivity_custom_id)
+                if os.path.exists(sigma_stats_path):
+                    logger.info(f"Sigma greatest diversity stats file found for database {database}. Skipping calculation.")
+                    sigma_stats = read_csv(sigma_stats_path)
+                else:
+                    sigma_stats = determine_sigma_greatest_diversity(database, sigmas, variables, output_id=sensitivity_custom_id)
+            sigma = _select_sigma_from_stats(sigma_stats)
+            if sigma_selection_level == 'composite':
+                logger.info(f"Sigma value of {sigma} gives highest IQR for final composite weights in the {database} database.")
+            else:
+                logger.info(f"Sigma value of {sigma} gives highest median IQR for weights across variables {database} database.")
         except FileNotFoundError:
             logger.warning(NO_SIGMA_SENSITIVITY_DATA)
             logger.warning('Reverting to default sigma value for diversity weighting.')
@@ -168,25 +601,23 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
     """
     
     
-    if os.path.exists(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma{custom_id_addition}.csv'):
-        logger.info(f"Variable weights file found for {database}"
-              f" with {sigma} sigma. Using this for composite weight calculation.")
-        scenario_variable_weights = read_csv(DIVERSITY_DIR + f'variable_weights_{database}_{sigma}_sigma{custom_id_addition}.csv')
-        if os.path.exists(DIVERSITY_DIR + f'composite_weights_{database}_{sigma}_sigma{custom_id_addition}{comp_custom_id_addition}.csv') and not composite_override:
-            logger.info(f"Composite weights file found for {database}"
-                  f" with {sigma} sigma. Skipping calculation.")
-        else:
-            logger.info(f'Calculating composite weights for database {database} with {sigma} sigma...')
-            calculate_composite_weight(scenario_variable_weights, data_for_diversity, 
-                                       f'{database}_{sigma}_sigma{custom_id_addition}{comp_custom_id_addition}', variable_info=variable_weights)
-
-    else:
-        logger.warning(f"Variable weights file not found for {database} with {sigma} sigma.")
-        logger.warning('Please ensure variable weights file is in place or run the variable'
-              ' weight calculation step with the desired sigma value.')
+    if diversity_mode == 'hybrid':
+        logger.info('Running hybrid diversity weighting using model-agnostic and model-family-separate composite weights.')
+    output_df = _run_diversity_mode_for_sigma(
+        database,
+        sigma,
+        data_for_diversity,
+        variables,
+        variable_weights,
+        diversity_mode,
+        composite_override=composite_override,
+        custom_id_addition=custom_id_addition,
+        comp_custom_id_addition=comp_custom_id_addition,
+    )
     
     logger.info('Diversity weighting has finished running. Please check the outputs/diversity/'
           ' directory for the variable and composite weights files.')
+    return output_df
 
 
 # Function that calculates pairwise RMS distances for each variable in the data
@@ -529,9 +960,16 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id,
         raw_weights = similarity_matrix.sum(axis=1)  # sum of the weights for each scenario from each pairing
 
         if within_model:
-            # normalise the weights within each model family group
-            raw_weights = raw_weights / (same_family.sum(axis=1) - 1)
-            # to do: add error if only 1 scenario from model family
+            counts = mask.sum(axis=1)  
+            if np.any(counts <= 0):
+                bad = [model_scen_list[i] for i in np.where(counts <= 0)[0]]
+                logger.warning(
+                    f"Some scenarios have no valid same-family comparisons for variable "
+                )
+            raw_weights = np.full(n, np.nan)          
+            valid = counts > 5                        
+            raw_weights[valid] = similarity_matrix.sum(axis=1)[valid] / counts[valid]
+            raw_weights = raw_weights / counts
         
         for i, (model, scen) in enumerate(model_scen_list):
             results.append({
@@ -553,7 +991,8 @@ def calculate_variable_weights(pairwise_rms_df, sigmas, database, output_id,
 def calculate_composite_weight(weighting_data_file, 
                                original_scenario_data, 
                                output_id, variable_info,
-                               flat_weights=None, output_dir=DIVERSITY_DIR):
+                               flat_weights=None, output_dir=DIVERSITY_DIR,
+                               nan_replace=False):
 
     """
     Function that combines the weights from each of the variables using the group and sub-group weights. Allows for underreporting
@@ -566,7 +1005,7 @@ def calculate_composite_weight(weighting_data_file,
         variable_info (dict): Dictionary containing the weights for each group/sub-group. Default is the global VARIABLE_INFO.
         flat_weights (dict): Optional dictionary containing flat weights for each variable. If provided, this will override the variable_info weights and
         ignore the group and sub-group weights.
-    
+        nan_replace (str): when active, replaces NaN weights with the median weight.
     Outputs:
         DataFrame: A DataFrame containing the combined weights for each scenario and variable.    
     
@@ -605,6 +1044,7 @@ def calculate_composite_weight(weighting_data_file,
         models.append(original_scenario_data_subset['Model'].values[0])
         
         if len(original_scenario_data_subset) != len(variables):
+            
             # get the missing variables for this scenario_model
             missing_variables = set(variables) - set(original_scenario_data_subset['Variable'].unique())
             
@@ -634,15 +1074,22 @@ def calculate_composite_weight(weighting_data_file,
         weights.append(sum(
             scenario_weighting_data['Weight'] * scenario_weighting_data['variable_weight']
         ))
+    
 
 
     # NOTE: thus far, the weights are not inverted. High weighting at this point
     # means the scenario is more similar to the others, and thus less diverse.
     # Inverting the weights means that high weighting means the scenario is more diverse.
     weights = np.array(weights)
-    
+    print('The number of NaN weights is:', np.isnan(weights).sum())
+    if nan_replace:
+        median_weight = np.nanmedian(weights)
+        weights = np.where(np.isnan(weights), median_weight, weights)
+
+
     # Rank invert the weights
     inverted_weights = weights.max() - weights + weights.min()
+    print(inverted_weights)    
     
     # Normalise to probability distribution
     final_weights = inverted_weights / np.sum(inverted_weights)  # normalise the weights to sum to 1
@@ -705,15 +1152,8 @@ def adjust_weights_for_missing_variables(missing_variables, variable_info):
 
 
 
-
-# 
-
-
-
-
-
 # function that determines the sigma value for the greatest diversity (IQR)
-def determine_sigma_greatest_diversity(database, sigma_values, variables):
+def determine_sigma_greatest_diversity(database, sigma_values, variables, output_id=None):
     """
     Function that runs through each dataframe with different sigma values, calculates
     the **normalised IQR for each variable**, calculates the mean IQR for the set and 
@@ -734,7 +1174,7 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
     for sigma in sigma_values:
 
         # open the relevant pairwise RMS distances file
-        sigma_df = read_csv(DIVERSITY_DIR + f"variable_weights_{database}_{sigma}_sigma.csv")
+        sigma_df = read_csv(DIVERSITY_DIR + f"variable_weights_{database}_{sigma}_sigma{output_id}.csv")
         current_variables = sigma_df['Variable'].unique().tolist()
 
         iqrs = []
@@ -759,7 +1199,7 @@ def determine_sigma_greatest_diversity(database, sigma_values, variables):
         })], ignore_index=True)
 
     # Save the stats DataFrame to a CSV file
-    stats.to_csv(DIVERSITY_DIR + f'sigma_greatest_diversity_{database}.csv', index=False)
+    stats.to_csv(_sigma_diversity_path(database, output_id), index=False)
     return stats
 
 

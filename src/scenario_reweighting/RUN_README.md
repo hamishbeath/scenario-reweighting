@@ -55,6 +55,20 @@ QUALITY_DATA_FILE   = ['quality_weighting_data.csv']
 DATABASE = 'ar6'   # 'ar6' or 'sci'
 ```
 
+### 4. Diversity mode selector (in `run.py`)
+
+```python
+DIVERSITY_MODE = 'hybrid'  # 'model_agnostic', 'model_separate', or 'hybrid'
+```
+
+This controls how the diversity module treats similarity across model families:
+
+| Value | Description |
+|--------|-------------|
+| `model_agnostic` | Compare all scenarios across the full ensemble. |
+| `model_separate` | Compare only scenarios in the same model family. |
+| `hybrid` | Run both diversity modes and blend their final composite probability weights 50/50. |
+
 Set `DATABASE` to match the scenario ensemble you are working with:
 
 | Value  | Description |
@@ -100,6 +114,8 @@ outputs/
 ├── quality/
 └── relevance/
 ```
+
+Hybrid diversity outputs are written to the existing `outputs/diversity/` directory using a `_hybrid_equal` suffix in the filename.
 
 ---
 

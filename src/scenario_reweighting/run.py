@@ -3,7 +3,7 @@
 # import utils.file_parser
 
 import pandas as pd
-from constants import INPUT_DIR, DIVERSITY_DIR, CATEGORIES_ALL, VETTING_VARS, CORREL_ADJUSTED_WEIGHTS_FLAT_HC_SCI
+from constants import INPUT_DIR, DIVERSITY_DIR, CATEGORIES_ALL, VETTING_VARS, CORREL_ADJUSTED_WEIGHTS_FLAT_HC_SCI, SCI_HARMONISED_VARS
 from diversity import get_snapshot_variable_correlation, find_optimal_threshold, main as diversity_main, run_hierarchical_clustering
 from quality import main as quality_main
 from relevance import main as relevance_main
@@ -15,9 +15,10 @@ import sys
 
 DIVERSITY_DATA_FILE = 'diversity_data_sci.csv'
 META_DATA_FILE = INPUT_DIR + 'sci_meta_data.csv'
-# QUALITY_DATA_FILE = 'quality_data_sci.csv'
-QUALITY_DATA_FILE = 'quality_data_ar6_update.csv'
+QUALITY_DATA_FILE = 'quality_data_sci.csv'
+# QUALITY_DATA_FILE = 'quality_data_ar6_update.csv'
 DATABASE = 'sci' # 'ar6' or 'sci' - note, sci only supported for diversity weighting at present.
+DIVERSITY_MODE = 'hybrid'  # options: 'model_agnostic', 'model_separate', 'hybrid'
 
 def main(diversity=True, quality=False, relevance=False):
     
@@ -34,14 +35,14 @@ def main(diversity=True, quality=False, relevance=False):
 
     # sci_database = read_pyam_df(INPUT_DIR + 'sci_full_ensemble.csv')    
     # scenarios = read_csv(INPUT_DIR + 'sci_scenarios_with_mandatory_variables.csv')
-    # variables = TIER_0_VARIABLES_SCI + TIER_0_VARIABLES_SCI_OPT
+    # variables = SCI_HARMONISED_VARS
     # diversity_data = sci_database.filter(scenario=scenarios['Scenario'].tolist(), 
     #                                      model=scenarios['Model'].tolist(), 
     #                                      variable=variables,
     #                                      year=range(2020, 2101))
     
-    # # Save diversity data to file
-    # diversity_data.to_csv(INPUT_DIR + 'diversity_data_sci.csv', iamc_index=False)
+    # Save diversity data to file
+    # diversity_data.to_csv(INPUT_DIR + 'harmonised_data_sci.csv', iamc_index=False)
     
     """"
     Check for variable coverage
@@ -64,13 +65,19 @@ def main(diversity=True, quality=False, relevance=False):
         # read in data for diversity calculation
         scenarios_data = read_csv(INPUT_DIR + DIVERSITY_DATA_FILE)
         # run diversity calculation sequentially
-        diversity_main(database=DATABASE, start_year=2020, end_year=2101, 
-                        data_for_diversity=scenarios_data, 
-                        default_sigma=True,
-                        within_model=True,
-                        composite_override=True,
-                        custom_id_addition='_within_model')
+        for sigma in ['0.60', '0.70', '0.80', '0.90']:
+            diversity_main(database=DATABASE, start_year=2020, end_year=2101, 
+                            data_for_diversity=scenarios_data,
+                            default_sigma=False,
+                            specify_sigma=sigma,
+                            sensitivity_override=False,
+                            variable_weights=CORREL_ADJUSTED_WEIGHTS_FLAT_HC_SCI,
+                            composite_override=True,
+                            custom_id_addition='',
+                            comp_custom_id_addition='_corr',
+                            diversity_mode=DIVERSITY_MODE)
         
+
         # correlations = get_snapshot_variable_correlation(scenarios_data, variables=TIER_0_VARIABLES_SCI, 
         # #                                               output_id='sci')
         # correlations = pd.read_csv(DIVERSITY_DIR + 'variable_correlation_matrix_sci_SNAPSHOT.csv', index_col=0)
@@ -91,8 +98,14 @@ def main(diversity=True, quality=False, relevance=False):
             database=DATABASE,
             vetting_criteria=None,
             interpolate=False,
-            hard_vetting=False
+            hard_vetting=True,
+            granular=True,
+            custom_id_addition='_granular_HV'
         )
+
+        
+
+
 
     if relevance:
         check_io(relevance=True)

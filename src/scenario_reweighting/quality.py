@@ -30,6 +30,8 @@ def main(
     interpolate=False,
     quality_override=True,
     hard_vetting=True,
+    granular=True,
+    custom_id_addition=''
 ):
     """
     Calculate continuous quality weighting for vetting criteria.
@@ -44,7 +46,7 @@ def main(
         quality_override: Whether to override existing quality weights (if they exist).
         hard_vetting: Whether to apply hard vetting (i.e. remove scenarios that fail
         or don't report any criterion instead of weighting them).
-        
+        granular: Whether to calculate quality weights granularly (per criterion and year) 
     Returns:
         DataFrame with quality_weighting for each scenario/model/category.
 
@@ -56,10 +58,13 @@ def main(
             "Please ensure AR6 or SCI data is in place and specify 'ar6' or 'sci' for the "
             "database argument."
         )
-
-    if os.path.exists(QUALITY_DIR + f'{database}_quality_weights.csv') and not quality_override:
+    if granular:
+        filepath = QUALITY_DIR + f'{database}_granular_quality_weights.csv'
+    else:
+        filepath = QUALITY_DIR + f'{database}_quality_weights.csv'
+    if os.path.exists(filepath) and not quality_override:
         logger.info("Quality weights already exist for this database.")
-        quality_weights = pd.read_csv(QUALITY_DIR + f'{database}_quality_weights.csv')
+        quality_weights = pd.read_csv(filepath)
 
     else:
         logger.info("Calculating quality weighting for the scenario data...")
@@ -71,15 +76,24 @@ def main(
             elif database == "ar6":
                 vetting_criteria = VETTING_CRITERIA
                 logger.info("Using vetting criteria for AR6 data")
-
-        quality_weights = calculate_quality_weighting(
-            quality_weighting_data,
-            database=database,
-            vetting_criteria=vetting_criteria,
-            interpolate=interpolate,
-            hard_vetting=hard_vetting,
-        )
-
+        if not granular:
+            quality_weights = calculate_quality_weighting(
+                quality_weighting_data,
+                database=database,
+                vetting_criteria=vetting_criteria,
+                interpolate=interpolate,
+                hard_vetting=hard_vetting,
+                custom_id_addition=custom_id_addition
+            )
+        elif granular:
+            quality_weights = calculate_quality_weighting_granular(
+                quality_weighting_data,
+                database=database,
+                vetting_criteria=vetting_criteria,
+                interpolate=interpolate,
+                hard_vetting=hard_vetting,
+                custom_id_addition=custom_id_addition 
+            )
         logger.info(
             "Quality weighting calculation complete.\n"
             "Please see outputs/quality for the results."
@@ -328,6 +342,245 @@ def calculate_quality_weighting(
     # Save output
     output_df.to_csv(QUALITY_DIR + f"{database}_quality_weights.csv")
     return output_df
+
+
+def calculate_quality_weighting_granular(
+    scenario_data,
+    database,
+    vetting_criteria=VETTING_CRITERIA,
+    interpolate=False,
+    hard_vetting=False,
+    full_weight_threshold=0.05,
+    custom_id_addition=''
+):
+    """
+    Calculate per-criterion, per-year quality weighting with normalised combination.
+
+    Produces a separate weight for each criterion and year combination.  Each
+    weight column is normalised to a probability distribution before all columns
+    are summed and re-normalised into a final composite weight.
+
+    Key differences from ``calculate_quality_weighting``:
+        - Weights are computed per criterion *and* per year (not averaged
+          across years for multi-year criteria).
+        - A ``full_weight_threshold`` grants full weight to scenarios whose
+          percentage distance from the target is within this tolerance.
+          Beyond this buffer and up to the vetting range, IQR-based
+          exponential down-weighting is applied.
+        - Scenarios outside the vetting range receive weight 0.
+        - Each criterion-year weight is normalised to sum to 1 before the
+          columns are combined.
+        - Non-reporting scenarios receive weight 0 (soft vetting) or are
+          excluded entirely (hard vetting).
+
+    Parameters:
+        scenario_data: DataFrame with scenario data for quality weighting.
+        database: String specifying the database (e.g. 'ar6' or 'sci').
+        vetting_criteria: Dict with vetting criteria variables.
+        interpolate: Whether to interpolate scenario data (needed for AR6).
+        hard_vetting: If True, only scenarios that report *and* pass every
+            criterion/year are retained.  If False, non-reporting or
+            out-of-range scenarios receive 0 for that criterion/year but
+            remain in the output.
+        full_weight_threshold: Fractional tolerance (default 0.05 = 5%).
+            Scenarios whose percentage distance from the target is at most
+            this value receive full weight (1.0) for that criterion/year.
+            Set to 0.0 to disable.
+        custom_id_addition: String to append to the output files
+
+    Returns:
+        DataFrame indexed by (Scenario, Model) with per-criterion-year
+        distance and normalised weight columns plus a final 'Weight' column.
+    """
+
+    if "Region" in scenario_data.columns:
+        scenario_data = scenario_data.drop(columns=["Region"])
+    if "Unit" in scenario_data.columns:
+        scenario_data = scenario_data.drop(columns=["Unit"])
+
+    if interpolate:
+        scenario_data = interpolate_quality_vars(scenario_data)
+        scenario_data = scenario_data.reset_index()
+
+    # Complete (Scenario, Model) index covering every scenario in the data
+    all_sm = (
+        scenario_data[["Scenario", "Model"]]
+        .drop_duplicates()
+        .set_index(["Scenario", "Model"])
+        .index
+    )
+    all_scenarios = len(all_sm)
+
+    quality_stats_rows = []
+    # Per-criterion-year results keyed by readable label
+    criterion_weights = {}    # raw (un-normalised) weights
+    criterion_distances = {}  # percentage distances
+
+    # --- per-criterion, per-year weight computation -------------------------
+    for criteria, vars_cfg in vetting_criteria.items():
+
+        if not vars_cfg.get("Include", True):
+            continue
+
+        variables = vars_cfg["Variables"]
+        values = vars_cfg["Value"]
+        ranges = vars_cfg["Range"]
+        years = vars_cfg["Year"]
+
+        criteria_data = scenario_data[
+            scenario_data["Variable"].isin(variables)
+        ]
+        grouped = criteria_data.groupby(["Scenario", "Model"])
+
+        is_multi = isinstance(years, list)
+        year_list = years if is_multi else [years]
+        value_list = values if is_multi else [values]
+        range_list = ranges if is_multi else [ranges]
+
+        for year, target_val, vetting_range in zip(
+            year_list, value_list, range_list
+        ):
+            ycol = year if interpolate else str(year)
+
+            yr_sums = grouped[ycol].sum(min_count=1).reset_index()
+            yr_sums = yr_sums.set_index(["Scenario", "Model"])
+
+            # Percentage distance from target
+            pct_dist = (yr_sums[ycol] - target_val).abs() / abs(target_val)
+
+            # Classify scenarios
+            reports = pct_dist.notna()
+            within_full = pct_dist <= full_weight_threshold
+            within_range = pct_dist <= vetting_range
+            in_band = within_range & ~within_full & reports
+
+            # Initialise weights to 0 for every scenario
+            w = pd.Series(0.0, index=all_sm)
+            d = pd.Series(np.nan, index=all_sm)
+
+            # Record distance for reporting scenarios
+            d.loc[pct_dist.index] = pct_dist
+
+            # Full weight for scenarios within the full_weight_threshold
+            full_idx = within_full[within_full].index
+            w.loc[full_idx] = 1.0
+
+            # IQR-based down-weighting for scenarios between the
+            # full_weight_threshold and the vetting range
+            band_idx = in_band[in_band].index
+            if len(band_idx) > 0:
+                excess = pct_dist.loc[band_idx] - full_weight_threshold
+                iqr = excess.quantile(0.75) - excess.quantile(0.25)
+                if iqr > 0:
+                    scaled = excess / iqr
+                else:
+                    # All at the same distance → treat as full weight
+                    scaled = pd.Series(0.0, index=band_idx)
+                w.loc[band_idx] = np.exp(-(scaled ** 2))
+
+            # Scenarios outside vetting range or non-reporting remain at 0
+
+            key = f"{criteria}_{year}"
+            criterion_weights[key] = w
+            criterion_distances[key] = d
+
+            # Quality statistics
+            reporting = int(reports.sum())
+            has_var = len(yr_sums)
+            no_var = all_scenarios - has_var
+            null_year = has_var - reporting
+            n_pass = int(within_range.sum())
+            quality_stats_rows.append({
+                "criteria": criteria,
+                "year": year,
+                "total_scenarios": all_scenarios,
+                "reporting_data": reporting,
+                "not_reporting_data": no_var + null_year,
+                "no_variable_reported": no_var,
+                "variable_but_null_year": null_year,
+                "within_full_weight": int(within_full.sum()),
+                "in_downweight_band": len(band_idx),
+                "pass": n_pass,
+                "fail_but_reporting": reporting - n_pass,
+            })
+
+            logger.info(
+                f"Criteria '{criteria}' year {year}: "
+                f"{int(within_full.sum())} full weight, "
+                f"{len(band_idx)} down-weighted, "
+                f"{reporting - n_pass} fail, "
+                f"{no_var + null_year} non-reporting"
+            )
+
+    # --- hard vetting: keep only scenarios passing every criterion/year ------
+    if hard_vetting:
+        weight_df = pd.DataFrame(criterion_weights)
+        valid_mask = (weight_df > 0).all(axis=1)
+        valid_idx = weight_df.index[valid_mask]
+
+        logger.info(
+            f"Hard vetting: keeping {len(valid_idx)} of {all_scenarios} "
+            f"scenarios that report and pass all criteria/years"
+        )
+
+        criterion_weights = {
+            k: v.loc[valid_idx] for k, v in criterion_weights.items()
+        }
+        criterion_distances = {
+            k: v.loc[valid_idx] for k, v in criterion_distances.items()
+        }
+
+    # --- normalise each criterion-year to a probability distribution --------
+    normalised_weights = {}
+    for key, w in criterion_weights.items():
+        total = w.sum()
+        if total > 0:
+            normalised_weights[key] = w / total
+        else:
+            logger.warning(
+                f"All weights zero for '{key}'; column left as zeros."
+            )
+            normalised_weights[key] = w
+
+    # --- assemble output DataFrame ------------------------------------------
+    output_df = pd.DataFrame()
+
+    for key in criterion_weights:
+        output_df[f"{key}_distance"] = criterion_distances[key]
+        output_df[f"{key}_norm_weight"] = normalised_weights[key]
+
+    # Sum normalised weights across criteria/years, then re-normalise
+    norm_cols = [c for c in output_df.columns if c.endswith("_norm_weight")]
+    output_df["total_quality_weighting"] = output_df[norm_cols].sum(axis=1)
+
+    total_sum = output_df["total_quality_weighting"].sum()
+    if total_sum > 0:
+        output_df["quality_weighting"] = (
+            output_df["total_quality_weighting"] / total_sum
+        )
+    else:
+        output_df["quality_weighting"] = 0.0
+
+    output_df["Weight"] = output_df["quality_weighting"]
+
+    # Drop the running total (per-criterion columns kept for interpretability)
+    output_df = output_df.drop(columns=["total_quality_weighting"])
+
+    # --- persist quality stats and weights ----------------------------------
+    quality_stats_df = pd.DataFrame(quality_stats_rows)
+    quality_stats_df.to_csv(
+        QUALITY_DIR + f"{database}_granular_quality_stats{custom_id_addition}.csv", index=False
+    )
+    logger.info(
+        f"Granular quality stats saved to "
+        f"{QUALITY_DIR}{database}_granular_quality_stats{custom_id_addition}.csv"
+    )
+
+    output_df.to_csv(
+        QUALITY_DIR + f"{database}_granular_quality_weights{custom_id_addition}.csv"
+    )
+    return output_df
+
 
 
 def interpolate_quality_vars(scenario_data):

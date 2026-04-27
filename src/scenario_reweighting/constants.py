@@ -19,6 +19,9 @@ CATEGORIES_ALL = ['C1', 'C2', 'C3', 'C4', 'C5','C6', 'C7', 'C8']
 CATEGORIES_DEFAULT = CATEGORIES_ALL[:2]
 CATEGORIES_15 =  ['C1', 'C1a_NZGHGs', 'C2']
 
+CATEGORIES_SCI = ['GW1', 'GW2', 'GW3']
+CATEGORIES_SCI_ALL = ['GW0, GW1', 'GW2', 'GW3', 'GW4', 'GW5', 'GW6', 'GW7', 'GW8']
+
 GROUP_MODES = ['Model_family', 'Project']
 
 #Weighting constants
@@ -63,9 +66,24 @@ TIER_0_VARIABLES_SCI = ['Emissions|CO2',
                     'GDP|PPP', 
                     'Consumption']
 
+TIER_0_VARIABLES_INCLUDED = ['Emissions|CO2',
+                             'Emissions|N2O',
+                             'Primary Energy|Non-Biomass Renewables',
+                             'Primary Energy|Nuclear',
+                             'Consumption',
+                             'GDP|PPP',
+                             'Price|Carbon',
+                            'Carbon Capture|Geological Storage']
+                             
+
 TIER_0_VARIABLES_SCI_OPT = ['Carbon Capture|Geological Storage',
                         'Price|Carbon', 'GDP|PPP', 'Consumption']
 
+SCI_HARMONISED_VARS = ['Climate Assessment|Harmonized|Emissions|Kyoto Gases (AR6-GWP100)',
+                        'Climate Assessment|Infilled|Emissions|Kyoto Gases (AR6-GWP100)',
+                        'Climate Assessment|Harmonized|Emissions|CO2|Energy and Industrial Processes',
+                        'Climate Assessment|Infilled|Emissions|CO2|Energy and Industrial Processes',
+                        'Emissions|Kyoto Gases', 'Emissions|CO2']
 
 VARIABLE_GROUPS = {
     'Emissions|CH4': 'Emissions', 
@@ -566,7 +584,7 @@ CORREL_ADJUSTED_WEIGHTS_FLAT_HC_SCI = {
         'group_weight': 1,
         'subgroup_weight': 0.125
     },
-    'Carbon Sequestration|CCS': {
+    'Carbon Capture|Geological Storage': {
         'group': 'Mitigation',
         'group_weight': 1,
         'subgroup_weight': 0.125
@@ -577,6 +595,7 @@ CORREL_ADJUSTED_WEIGHTS_FLAT_HC_SCI = {
         'subgroup_weight': 0.125
     }
 }
+
 VARIABLE_INFO_NO_EMISSIONS = {
     'Emissions|CH4': {
         'group': 'Emissions',
@@ -680,7 +699,7 @@ SIGMA_DEFAULT_AR6 = '0.20'
 SIGMA_DEFAULT_SCI = '0.20'
 
 MODES_COLOURMAPS = {
-    'Project_study': {
+    'Project': {
         'CD-LINKS': '#e6194b', 'COMMIT': '#3cb44b', 'ENGAGE': '#ffe119',
         'Fujimori 2020': '#4363d8', 'Holz 2018': '#f58231', 'SSP': '#911eb4',
         'Ou 2021': '#46f0f0', 'van Vuuren 2021': '#f032e6', 'ADVANCE': '#bcf60c', 'EMF30': '#ff7f0e',
@@ -688,8 +707,41 @@ MODES_COLOURMAPS = {
         'Kikstra 2021': '#9a6324', 'Strefler 2018': '#fffac8', 'Strefler 2021a': '#800000',
         'Schultes 2021': '#aaffc3', 'Baumstark 2021': '#808000', 'Kriegler 2018': '#ffd8b1',
         'Bertram 2018': '#000075', 'Strefler 2021b': '#808080', 'Soergel 2021': '#ffffff',
-        'Luderer 2021': '#000000', 'Other': "#7f7f7f", 'Guo 2021': '#c0c0c0', 'Levesque 2021': '#ffbb78'
+        'Luderer 2021': '#000000', 'Other': "#7f7f7f", 'Guo 2021': '#c0c0c0', 'Levesque 2021': '#ffbb78',
+        'ENGAGE [Horizon 2020]': '#ffe119', 'SHAPE [JPI Climate]': '#f0a0a0', 'CEMICS (REMIND)': '#c49c94',
+        'SSP-2021 (IMAGE)': '#c49c94', 'NAVIGATE [Horizon 2020]': '#9a6324', 'COMMIT [Horizon 2020]':'#3cb44b'
+        # 'CD-LINKS [Horizon 2020]': '#e6194b', 'ADVANCE [EU FP7]': '#bcf60c', 'TechCost (REMIND)': '#c49c94',
+        # 'Deep-Mitigation (GCAM)': '#ff9896', 'INNOPATHS [Horizon 2020]': '#fffac8', 'GEI (MESSAGEix)': '#1f77b4',
+        # 'NGFS Phase 5': '#e6beff', 'RESCUE [Horizon Europe]': '#9a6324', 'NGFS Phase 2': '#e6beff',
+        # 'Rescuing 1.5°C [IKEA Foundation]': '#ff7f0e',  'SDI (AIM/Hub-Global)': '#c49c94','R2p1 (REMIND)': '#c49c94',
+        # 'LeastTotalCost (REMIND-MAgPIE)': '#c49c94', 'COVID-Shift (MESSAGEix-GLOBIOM)': '#c49c94','PEP-1.5°C (REMIND-MAgPIE)': '#c49c94',
+        # 'UFOPLAN (REMIND-MAgPIE)': '#c49c94', 'Deep-Electrification (REMIND-MAgPIE)': '#c49c94', 'BEG (REMIND)': '#c0c0c0'
     },
+    'Project_sci': {
+    'SDI (AIM/Hub-Global)': '#1f77b4',
+    'SSP': '#911eb4',
+    'NGFS Phase 2': '#e6beff',
+    'NGFS Phase 5': '#17becf',
+    'COMMIT [Horizon 2020]': '#3cb44b',
+    'ENGAGE [Horizon 2020]': '#ffe119',
+    'SSP-2021 (IMAGE)': '#c49c94',
+    'NAVIGATE [Horizon 2020]': '#9a6324',
+    'COVID-Shift (MESSAGEix-GLOBIOM)': '#8c564b',
+    'EMF30': '#ff7f0e',
+    'ADVANCE [EU FP7]': '#bcf60c',
+    'CEMICS (REMIND)': '#c49c94',
+    'LeastTotalCost (REMIND-MAgPIE)': '#2ca02c',
+    'R2p1 (REMIND)': '#d62728',
+    'Rescuing 1.5°C [IKEA Foundation]': '#9467bd',
+    'BEG (REMIND)': '#7f7f00',
+    'CD-LINKS [Horizon 2020]': '#e6194b',
+    'EMF33': '#fabebe',
+    'PEP-1.5°C (REMIND-MAgPIE)': '#aec7e8',
+    'UFOPLAN (REMIND-MAgPIE)': '#ff9896',
+    'Deep-Electrification (REMIND-MAgPIE)': '#98df8a',
+    'SHAPE [JPI Climate]': '#f0a0a0',
+    'RESCUE [Horizon Europe]': '#c5b0d5',
+},
     'Model_type': {
         'IT_GE': '#d2f53c', 'IT_PE': '#fabea4', 'RD_CGE': '#6a3d9a',
         'RD_PE': "#469990", 'SD': '#e8a3fd'
@@ -789,6 +841,7 @@ ASSESSMENT_VARIABLES = ['Net zero GHG year_harmonised',
 
 # Plotting constants
 CATEGORY_COLOURS = ['#97CAEA', '#3070AD',  '#DC267F', '#C0C0C0', '#909090']
+HIST_SCI_COLOURS = ['#c7e9c0', '#a1d99b', '#4460fa', '#7666DA', '#909090']
 CATEGORY_COLOURS_SHADES = ['#648FFF', '#4660b2', '#FFB000', '#b27e00', '#DC267F', '#981754']
 CATEGORY_COLOURS_SHADES_DICT = {'C1':['#648FFF', '#4660b2'], 'C1a_NZGHGs':['#97CAEA', '#6EA3C4'], 'C2':['#DC267F', '#981754']}
 MODES_COLOURS = {'Model_family': '#FFB000',
@@ -811,6 +864,15 @@ CATEGORY_NAMES = [
     # 'Below 3°C', 
     # 'Below 4°C',
     # 'Above 4°C']
+
+CATEGORY_NAMES_SCI = [
+    'GW1',
+    'GW2',
+    'GW3',
+    'GW4',
+    'GW5-8'
+]
+
 
 CB_COLOUR_MAP = [
     "#000000",  # Black
@@ -844,6 +906,22 @@ COLOUR_DICT_STICK_PLOTS = {'Unweighted':{'C1':'#7798EC', 'C1a_NZGHGs':'#97CAEA',
                             'Reweighted':{'C1':'#6B88D4', 'C1a_NZGHGs':'#86B2CE', 'C2':'#DC267F'}}
 
 
+SCI_COLOURS_CAT = {
+    "GW0": "#e5f5e0",   # very light green
+    "GW1": "#c7e9c0",  # light green\n",
+    "GW2": "#a1d99b",  # medium green\n",
+    "GW2a": "#a1d99b",  # medium green\n",
+    "GW2b": "#31a354",          # dark green\n",
+    "GW3": "#4460fa",
+    "GW3a": "#d3d3d3",
+    "GW3b": "#A9A9A9",
+    "GW4": "#7666DA",    # very light peach\n",
+    "GW5": "#fba786",     # light coral\n",
+    "GW6": "#fb6a4a",     # medium red-orange\n",
+    "GW7": "#de2d26",     # strong red\n",
+    "GW8": "#a50f15"      # dark brick red\n",
+}
+
 # Relevance Weighting constants
 RELEVANCE_VARIABLES = {
     'C1': {'P33 peak warming (MAGICCv7.5.3)': 0.5, 'Median warming in 2100 (MAGICCv7.5.3)': 0.5},
@@ -856,6 +934,7 @@ RELEVANCE_THRESHOLDS = {
         'Median warming in 2100 (MAGICCv7.5.3)': 1.5
     }
 }
+
 
 # Quality Weighting Constants (AR6)
 VETTING_CRITERIA = {'CO2 Total':{'Variables':['Emissions|CO2'],
@@ -933,7 +1012,6 @@ VETTING_CRITERIA_SCI = {
         'Range': [0.25, 0.25, 0.40, 0.25],
         'Year': [2010, 2015, 2020, 2025]},  # +/- %
 }
-
 
 VETTING_VARS = ['Emissions|CO2', 'Emissions|CO2|Energy and Industrial Processes', 
                 'Emissions|CH4', 'Primary Energy',

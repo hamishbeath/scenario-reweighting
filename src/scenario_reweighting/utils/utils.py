@@ -159,30 +159,25 @@ def get_cumulative_values_pandas(df, meta_cols, start_year=2020, end_year=2100):
     return df_final
 
 
-# def find_missing_scenarios(df_main, df_check):
+def find_missing_scenarios(df_main, df_check):
     
-#     """
-#     Function that takes as input a main dataframe and a check dataframe,
-#       and returns a dataframe of scenarios that are in the main dataframe 
-#       but not in the check dataframe. 
+    """
+    Function that takes as input a main dataframe and a check dataframe,
+      and returns a dataframe of scenarios that are in the main dataframe 
+      but not in the check dataframe. 
 
-#     Inputs:
-#     - df_main (pd.DataFrame): The main dataframe containing the scenarios to check against
-#     - df_check (pd.DataFrame): The check dataframe containing the scenarios to check for
+    Inputs:
+    - df_main (pd.DataFrame): The main dataframe containing the scenarios to check against
+    - df_check (pd.DataFrame): The check dataframe containing the scenarios to check for
     
-#     Outputs:
-#     - missing (pd.DataFrame): A dataframe of scenarios that are in the main dataframe 
-#     but not in the check dataframe, with columns for model and scenario
+    Outputs:
+    - missing (pd.DataFrame): A dataframe of scenarios that are in the main dataframe 
+    but not in the check dataframe, with columns for model and scenario
     
-#     """
+    """
 
-#     missing = (df_main[['Model','Scenario']].drop_duplicates().merge(df_check[['Model','Scenario']].drop_duplicates(),on=['Model','Scenario'],
-# ...         how='left',
-# ...         indicator=True
-# ...     )
-# ...     .query("_merge == 'left_only'")
-# ...     .drop(columns='_merge'))
-#     return missing
+    missing = (df_main[['Model','Scenario']].drop_duplicates().merge(df_check[['Model','Scenario']].drop_duplicates(),                                                     on=['Model','Scenario'],how='left',indicator=True).query("_merge == 'left_only'").drop(columns='_merge'))
+    return missing
 
 
 # provides a list of scenarios that report on all of the mandatory variables for the given region
@@ -218,3 +213,63 @@ def mandatory_variables_scenarios(df, required_variables):
     output_df['scenario'] = model_scenario_pairs['Scenario'].values
         
     return output_df
+
+
+
+
+
+# Create helper functions
+def get_threshold(value):
+    if value == "ok":
+        return ["ok", "n/a"]
+    elif value == "medium":
+        return ["medium", "ok", "n/a"]
+    else:
+        raise ValueError(value)
+
+def get_flag_columns(df, group):
+    if isinstance(group, (list, tuple)):
+        return [
+            col for col in df.columns if any(col.startswith(i) for i in group)
+        ]
+    else:
+        return [col for col in df.columns if col.startswith(group)]
+
+def get_sustainability_criteria(df, threshold):
+    values = get_threshold(threshold)
+    return dict(
+        [(column, values) for column in get_flag_columns(df, group="Sustainability")]
+    )
+
+def get_feasibility_criteria(df, threshold):
+    values = get_threshold(threshold)
+    return dict(
+        [(column, values) for column in get_flag_columns(df, group="Feasibility")]
+    )
+
+
+def get_all_criteria(df, threshold):
+    values = get_threshold(threshold)
+    return dict(
+        [
+            (column, values)
+            for column in get_flag_columns(df, group=["Feasibility", "Sustainability"])
+        ]
+    )
+    # Deal with NA's
+    meta_indicator_cols = [
+        col
+        for col in df.columns
+        if col.startswith("Feasibility Concern") or col.startswith("Sustainability Concern")
+    ]
+    for col in meta_indicator_cols:
+        df[col] = df[col].fillna("n/a")
+    # Get the scenario subsets
+    df_vetted = df[df["Vetting|SCI 2025"] == "ok"]
+    criteria = get_all_criteria(df_vetted, "medium")
+    mask = pd.Series(True, index=df_vetted.index)
+    for col, allowed_values in criteria.items():
+        mask &= df_vetted[col].isin(allowed_values)
+    df_vetted_no_high_concern = df_vetted[mask]
+    
+    return df_vetted_no_high_concern
