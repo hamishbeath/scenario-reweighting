@@ -421,7 +421,8 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
          within_model=False,
          pairwise_override=False, sigma_override=False, sensitivity_override=False, 
          composite_override=False, specify_sigma=None, custom_vars=None, variable_weights=None,
-         custom_id_addition='', comp_custom_id_addition='', diversity_mode=None,
+         custom_id_addition='', comp_custom_id_addition='', pairwise_id_addition='',
+         diversity_mode=None,
          sigma_selection_level='variable'):
 
     """
@@ -473,14 +474,14 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
         variable_weights = VARIABLE_INFO if database == 'ar6' else VARIABLE_INFO_SCI
     
     # check for pairwise file first
-    if os.path.exists(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv') and not pairwise_override:
+    if os.path.exists(DIVERSITY_DIR + f'pairwise_rms_distances_{database}'+ f'{pairwise_id_addition}.csv') and not pairwise_override:
         logger.info(f"Pairwise RMS distances file found for database {database}. "
               "Skipping calculation.")
 
     else:
         logger.info(f"Calculating pairwise RMS distances for database {database}...")
         calculate_pairwise_rms_distances(data_for_diversity, variables, database, 
-        start_year=start_year, end_year=end_year)
+        start_year=start_year, end_year=end_year, pairwise_id_addition=pairwise_id_addition)
 
     """
     2. Calculate sigma values for each variable 
@@ -621,7 +622,7 @@ def main(database: str, start_year, end_year, data_for_diversity, default_sigma=
 
 
 # Function that calculates pairwise RMS distances for each variable in the data
-def calculate_pairwise_rms_distances(data, variables, database, start_year=2020, end_year=2100):
+def calculate_pairwise_rms_distances(data, variables, database, start_year=2020, end_year=2100, pairwise_id_addition=''):
 
     """
     Function that returns a DataFrame with pairwise RMS distances for each variable, for each
@@ -698,7 +699,7 @@ def calculate_pairwise_rms_distances(data, variables, database, start_year=2020,
     pairwise_rms_df = pd.DataFrame(results)
 
     # Save the results to a CSV file
-    pairwise_rms_df.to_csv(DIVERSITY_DIR + f'pairwise_rms_distances_{database}.csv', index=False)
+    pairwise_rms_df.to_csv(DIVERSITY_DIR + f'pairwise_rms_distances_{database}' + f'{pairwise_id_addition}.csv', index=False)
     return pairwise_rms_df
 
 

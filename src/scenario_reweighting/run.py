@@ -40,7 +40,6 @@ def main(diversity=True, quality=False, relevance=False):
     #                                      model=scenarios['Model'].tolist(), 
     #                                      variable=variables,
     #                                      year=range(2020, 2101))
-    
     # Save diversity data to file
     # diversity_data.to_csv(INPUT_DIR + 'harmonised_data_sci.csv', iamc_index=False)
     
@@ -64,18 +63,27 @@ def main(diversity=True, quality=False, relevance=False):
         
         # read in data for diversity calculation
         scenarios_data = read_csv(INPUT_DIR + DIVERSITY_DATA_FILE)
+        scenarios_data['Scenario_model'] = scenarios_data['Scenario'] + scenarios_data['Model']
+        vetted_and_data = read_csv(INPUT_DIR + 'sci_scenarios_with_mandatory_variables_with_meta_vetted.csv')
+        vetted_and_data['Scenario_model'] = vetted_and_data['Scenario'] + vetted_and_data['Model']
+        
+        #filter scenarios_data to only include scenarios model combinations in vetted_and_data
+        scenarios_data = scenarios_data[scenarios_data['Scenario_model'].isin(vetted_and_data['Scenario_model'])]
+        
         # run diversity calculation sequentially
-        for sigma in ['0.60', '0.70', '0.80', '0.90']:
-            diversity_main(database=DATABASE, start_year=2020, end_year=2101, 
-                            data_for_diversity=scenarios_data,
-                            default_sigma=False,
-                            specify_sigma=sigma,
-                            sensitivity_override=False,
-                            variable_weights=CORREL_ADJUSTED_WEIGHTS_FLAT_HC_SCI,
-                            composite_override=True,
-                            custom_id_addition='',
-                            comp_custom_id_addition='_corr',
-                            diversity_mode=DIVERSITY_MODE)
+        diversity_main(database=DATABASE, start_year=2020, end_year=2101, 
+                        data_for_diversity=scenarios_data,
+                        default_sigma=False,
+                        specify_sigma=None,
+                        sensitivity_override=False,
+                        variable_weights=CORREL_ADJUSTED_WEIGHTS_FLAT_HC_SCI,
+                        composite_override=False,
+                        pairwise_override=True,
+                        pairwise_id_addition='_vetted',
+                        custom_id_addition='_vetted',
+                        comp_custom_id_addition='_vetted_corr',
+                        diversity_mode=DIVERSITY_MODE,
+                        sigma_selection_level='composite')
         
 
         # correlations = get_snapshot_variable_correlation(scenarios_data, variables=TIER_0_VARIABLES_SCI, 
@@ -88,7 +96,6 @@ def main(diversity=True, quality=False, relevance=False):
     if quality:
 
         check_io(quality=True)
-
         # read in data for quality weighting calculation
         quality_weighting_data = read_csv(INPUT_DIR + QUALITY_DATA_FILE)
 
@@ -102,10 +109,6 @@ def main(diversity=True, quality=False, relevance=False):
             granular=True,
             custom_id_addition='_granular_HV'
         )
-
-        
-
-
 
     if relevance:
         check_io(relevance=True)
