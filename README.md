@@ -25,5 +25,10 @@ For detailed guidance on how to configure each of the modules, refer to the rele
 
 You will need to download the appropriate scenario ensemble data to run the weighting procedure. This can be downloaded from the [AR6 database](https://data.ene.iiasa.ac.at/ar6/#/login) or [SCI database](https://scenariocompass.org/) directly, or advanced users can use functionality within the utils module of this codebase that uses Pyam to download this data.
 
+## Funding
+This work was funded in part by the Bezos Earth Fund through the [Scenario Compass Initiative](https://scenariocompass.org/) (grant no. G-2023-201305841).
+
+
+
 
 
